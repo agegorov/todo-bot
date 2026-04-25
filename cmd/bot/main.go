@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
 	"github.com/aegorov/todo-bot/internal/api"
@@ -37,13 +37,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	conn, err := pgx.Connect(ctx, os.Getenv("DATABASE_URL"))
+	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("db connect: %v", err)
 	}
-	defer conn.Close(ctx)
+	defer pool.Close()
 
-	queries := db.New(conn)
+	queries := db.New(pool)
 	w := whisper.New(os.Getenv("WHISPER_ENDPOINT"))
 
 	b, err := bot.New(os.Getenv("TELEGRAM_TOKEN"), ownerID, queries, w)
