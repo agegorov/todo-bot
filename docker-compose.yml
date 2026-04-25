@@ -17,8 +17,9 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://todobot:todobot@postgres:5432/todobot
-      WHISPER_ENDPOINT: http://127.0.0.1:8080
-    network_mode: host
+      WHISPER_ENDPOINT: http://host.docker.internal:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - postgres
     restart: unless-stopped
