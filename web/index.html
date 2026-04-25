@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo Board</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      background: #1a1d2e;
+      border-bottom: 1px solid #2d3148;
+    }
+
+    header h1 { font-size: 18px; font-weight: 600; color: #a78bfa; }
+
+    .add-form {
+      display: flex;
+      gap: 8px;
+    }
+
+    .add-form input {
+      background: #252840;
+      border: 1px solid #3d4166;
+      border-radius: 8px;
+      padding: 8px 14px;
+      color: #e2e8f0;
+      font-size: 14px;
+      width: 340px;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .add-form input:focus { border-color: #a78bfa; }
+    .add-form input::placeholder { color: #64748b; }
+
+    .add-form button {
+      background: #a78bfa;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+
+    .add-form button:hover { background: #8b5cf6; }
+
+    .board {
+      display: flex;
+      gap: 16px;
+      padding: 24px;
+      overflow-x: auto;
+      min-height: calc(100vh - 65px);
+    }
+
+    .column {
+      background: #1a1d2e;
+      border-radius: 12px;
+      width: 300px;
+      min-width: 300px;
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 110px);
+    }
+
+    .column-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid #2d3148;
+    }
+
+    .column-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .column-count {
+      background: #252840;
+      border-radius: 20px;
+      padding: 2px 8px;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .column[data-status="todo"]        .column-title { color: #94a3b8; }
+    .column[data-status="in_progress"] .column-title { color: #60a5fa; }
+    .column[data-status="done"]        .column-title { color: #4ade80; }
+
+    .cards {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .cards::-webkit-scrollbar { width: 4px; }
+    .cards::-webkit-scrollbar-track { background: transparent; }
+    .cards::-webkit-scrollbar-thumb { background: #3d4166; border-radius: 4px; }
+
+    .card {
+      background: #252840;
+      border-radius: 10px;
+      padding: 12px;
+      cursor: grab;
+      border: 1px solid transparent;
+      transition: border-color .15s, transform .15s;
+      position: relative;
+    }
+
+    .card:hover { border-color: #3d4166; }
+    .card.dragging { opacity: .5; transform: scale(.97); }
+
+    .column.drag-over { background: #1e2240; }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .badge-project { background: #2d3148; color: #94a3b8; }
+    .badge-deadline { background: #1e3a5f; color: #60a5fa; }
+    .badge-deadline.overdue { background: #3b1f1f; color: #f87171; }
+    .badge-delegated { background: #2d1f3b; color: #c084fc; }
+
+    .priority-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .priority-1 { background: #f87171; }
+    .priority-2 { background: #fbbf24; }
+    .priority-3 { background: #4ade80; }
+
+    .card-actions {
+      position: absolute;
+      top: 8px; right: 8px;
+      display: none;
+      gap: 4px;
+    }
+
+    .card:hover .card-actions { display: flex; }
+
+    .card-actions button {
+      background: #3d4166;
+      border: none;
+      border-radius: 4px;
+      color: #94a3b8;
+      width: 22px; height: 22px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .15s;
+    }
+
+    .card-actions button:hover { background: #4f547a; color: #e2e8f0; }
+
+    .drop-zone {
+      min-height: 60px;
+      border-radius: 8px;
+      border: 2px dashed transparent;
+      transition: border-color .2s;
+    }
+
+    .drop-zone.active { border-color: #4f547a; background: #1e2240; }
+
+    .empty-state {
+      text-align: center;
+      color: #3d4166;
+      font-size: 13px;
+      padding: 20px 0;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: #252840;
+      border: 1px solid #3d4166;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #e2e8f0;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .3s, transform .3s;
+      z-index: 100;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📋 Todo Board</h1>
+  <form class="add-form" id="addForm">
+    <input type="text" id="taskInput" placeholder="Новая задача — 'купить молоко завтра' или 'ревью PR #работа срочно'" autocomplete="off">
+    <button type="submit">+ Добавить</button>
+  </form>
+</header>
+
+<div class="board" id="board">
+  <div class="column" data-status="todo">
+    <div class="column-header">
+      <span class="column-title">To Do</span>
+      <span class="column-count" id="count-todo">0</span>
+    </div>
+    <div class="cards" id="col-todo">
+      <div class="drop-zone" data-status="todo"></div>
+    </div>
+  </div>
+  <div class="column" data-status="in_progress">
+    <div class="column-header">
+      <span class="column-title">In Progress</span>
+      <span class="column-count" id="count-in_progress">0</span>
+    </div>
+    <div class="cards" id="col-in_progress">
+      <div class="drop-zone" data-status="in_progress"></div>
+    </div>
+  </div>
+  <div class="column" data-status="done">
+    <div class="column-header">
+      <span class="column-title">Done</span>
+      <span class="column-count" id="count-done">0</span>
+    </div>
+    <div class="cards" id="col-done">
+      <div class="drop-zone" data-status="done"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const API = '/api';
+  let dragId = null;
+
+  async function fetchTasks() {
+    const res = await fetch(`${API}/tasks`);
+    const tasks = await res.json();
+    renderBoard(tasks);
+  }
+
+  function renderBoard(tasks) {
+    ['todo','in_progress','done'].forEach(status => {
+      const col = document.getElementById(`col-${status}`);
+      // сохраняем drop-zone
+      const dz = col.querySelector('.drop-zone');
+      col.innerHTML = '';
+      const filtered = tasks.filter(t => t.status === status);
+      document.getElementById(`count-${status}`).textContent = filtered.length;
+      filtered.forEach(t => col.appendChild(makeCard(t)));
+      col.appendChild(dz);
+      if (!filtered.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = 'Нет задач';
+        col.insertBefore(empty, dz);
+      }
+    });
+  }
+
+  function makeCard(task) {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.draggable = true;
+    el.dataset.id = task.id;
+
+    const now = new Date();
+    const isOverdue = task.deadline && new Date(task.deadline) < now && task.status !== 'done';
+
+    el.innerHTML = `
+      <div class="card-actions">
+        <button title="Удалить" data-del="${task.id}">✕</button>
+      </div>
+      <div class="card-title">${esc(task.title)}</div>
+      <div class="card-meta">
+        <span class="priority-dot priority-${task.priority}"></span>
+        <span class="badge badge-project" style="border-left: 3px solid ${task.project_color}">${esc(task.project_name)}</span>
+        ${task.deadline ? `<span class="badge badge-deadline ${isOverdue?'overdue':''}">📅 ${esc(task.deadline)}</span>` : ''}
+        ${task.delegated_to ? `<span class="badge badge-delegated">👤 ${esc(task.delegated_to)}</span>` : ''}
+      </div>
+    `;
+
+    el.addEventListener('dragstart', () => {
+      dragId = task.id;
+      setTimeout(() => el.classList.add('dragging'), 0);
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      dragId = null;
+    });
+
+    el.querySelector('[data-del]').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('Удалить задачу?')) return;
+      await fetch(`${API}/tasks/${task.id}`, { method: 'DELETE' });
+      toast('Задача удалена');
+      fetchTasks();
+    });
+
+    return el;
+  }
+
+  // Drag & Drop для колонок
+  document.querySelectorAll('.cards').forEach(col => {
+    col.addEventListener('dragover', e => {
+      e.preventDefault();
+      col.querySelector('.drop-zone').classList.add('active');
+      col.closest('.column').classList.add('drag-over');
+    });
+    col.addEventListener('dragleave', e => {
+      if (!col.contains(e.relatedTarget)) {
+        col.querySelector('.drop-zone').classList.remove('active');
+        col.closest('.column').classList.remove('drag-over');
+      }
+    });
+    col.addEventListener('drop', async e => {
+      e.preventDefault();
+      col.querySelector('.drop-zone').classList.remove('active');
+      col.closest('.column').classList.remove('drag-over');
+      if (!dragId) return;
+      const status = col.closest('.column').dataset.status;
+      await fetch(`${API}/tasks/${dragId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      fetchTasks();
+    });
+  });
+
+  // Добавление задачи
+  document.getElementById('addForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const input = document.getElementById('taskInput');
+    const text = input.value.trim();
+    if (!text) return;
+    await fetch(`${API}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    input.value = '';
+    toast('✅ Задача создана');
+    fetchTasks();
+  });
+
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  fetchTasks();
+  setInterval(fetchTasks, 30000); // обновляем каждые 30 сек
+</script>
+</body>
+</html>

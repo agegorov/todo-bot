@@ -18,6 +18,11 @@ services:
     environment:
       DATABASE_URL: postgres://todobot:todobot@postgres:5432/todobot
       WHISPER_ENDPOINT: http://host.docker.internal:8080
+      WEB_PORT: "3000"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web:/web
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

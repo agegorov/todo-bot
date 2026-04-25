@@ -39,6 +39,7 @@ type Task struct {
 	IsRecurring bool               `json:"is_recurring"`
 	RecurRule   *string            `json:"recur_rule"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	Status      string             `json:"status"`
 }
 
 type TaskTag struct {

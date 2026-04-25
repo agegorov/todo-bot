@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 
+	"github.com/aegorov/todo-bot/internal/api"
 	"github.com/aegorov/todo-bot/internal/bot"
 	"github.com/aegorov/todo-bot/internal/db"
 	"github.com/aegorov/todo-bot/internal/scheduler"
@@ -52,6 +54,23 @@ func main() {
 	sched := scheduler.New(queries, b)
 	sched.Start()
 	defer sched.Stop()
+
+	// HTTP сервер для веб-интерфейса
+	webPort := os.Getenv("WEB_PORT")
+	if webPort == "" {
+		webPort = "3000"
+	}
+	srv := &http.Server{
+		Addr:    ":" + webPort,
+		Handler: api.New(queries).Router(),
+	}
+	go func() {
+		log.Printf("web: listening on :%s", webPort)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("web: %v", err)
+		}
+	}()
+	defer srv.Shutdown(context.Background())
 
 	log.Println("bot: started")
 	b.Run(ctx)
