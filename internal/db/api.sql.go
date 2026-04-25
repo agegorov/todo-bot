@@ -77,10 +77,14 @@ func (q *Queries) ListColumns(ctx context.Context) ([]BoardColumn, error) {
 const listTasksForBoard = `-- name: ListTasksForBoard :many
 SELECT t.id, t.title, t.notes, t.priority, t.deadline,
        t.column_id, t.delegated_to, t.is_recurring, t.created_at,
-       p.name AS project_name, p.color AS project_color
+       p.name AS project_name, p.color AS project_color,
+       COALESCE(array_agg(tg.name ORDER BY tg.name) FILTER (WHERE tg.name IS NOT NULL), '{}') AS tags
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
+LEFT JOIN task_tags tt ON tt.task_id = t.id
+LEFT JOIN tags tg ON tg.id = tt.tag_id
 WHERE t.done_at IS NULL
+GROUP BY t.id, p.name, p.color
 ORDER BY t.priority, t.deadline NULLS LAST, t.created_at
 `
 
@@ -96,6 +100,7 @@ type ListTasksForBoardRow struct {
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	ProjectName  string             `json:"project_name"`
 	ProjectColor string             `json:"project_color"`
+	Tags         interface{}        `json:"tags"`
 }
 
 func (q *Queries) ListTasksForBoard(ctx context.Context) ([]ListTasksForBoardRow, error) {
@@ -119,6 +124,7 @@ func (q *Queries) ListTasksForBoard(ctx context.Context) ([]ListTasksForBoardRow
 			&i.CreatedAt,
 			&i.ProjectName,
 			&i.ProjectColor,
+			&i.Tags,
 		); err != nil {
 			return nil, err
 		}

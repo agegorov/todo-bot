@@ -19,17 +19,37 @@
     .btn:hover{background:#8b5cf6}
     .btn.secondary{background:#252840;color:#94a3b8;border:1px solid #3d4166}
     .btn.secondary:hover{background:#2d3148;color:#e2e8f0}
-    .btn.danger{background:#3b1f1f;color:#f87171;border:1px solid #5c2626}
-    .btn.danger:hover{background:#4f2424}
 
-    /* ── Board ── */
-    .board{display:flex;gap:14px;padding:20px;align-items:flex-start;min-height:calc(100vh - 57px)}
+    /* ── Toolbar ── */
+    .toolbar{display:flex;align-items:center;gap:10px;padding:10px 20px;background:#13162a;border-bottom:1px solid #2d3148;flex-wrap:wrap}
+
+    .view-toggle{display:flex;background:#252840;border-radius:8px;padding:3px;gap:2px}
+    .view-btn{background:none;border:none;padding:5px 12px;border-radius:6px;color:#64748b;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+    .view-btn.active{background:#3d4166;color:#e2e8f0}
+
+    .tag-filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1}
+    .tag-filter-label{font-size:11px;color:#4a5280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+    .tag-chip{background:#252840;border:1px solid #3d4166;border-radius:20px;padding:3px 10px;font-size:12px;color:#64748b;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .tag-chip:hover{border-color:#a78bfa;color:#a78bfa}
+    .tag-chip.active{background:#2d1f3b;border-color:#a78bfa;color:#a78bfa}
+    .tag-chip.clear{color:#f87171;border-color:#5c2626}
+    .tag-chip.clear:hover{background:#3b1f1f}
+
+    /* ── Board (columns view) ── */
+    .board{display:flex;gap:14px;padding:20px;align-items:flex-start;min-height:calc(100vh - 113px)}
+
+    /* ── Tags view ── */
+    .tags-view{padding:20px;min-height:calc(100vh - 113px)}
+    .tag-group{margin-bottom:24px}
+    .tag-group-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .tag-group-name{font-size:13px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:.5px}
+    .tag-group-count{font-size:11px;background:#252840;border-radius:20px;padding:1px 7px;color:#4a5280}
+    .tag-group-cards{display:flex;flex-wrap:wrap;gap:10px}
 
     /* ── Column ── */
-    .column{background:#1a1d2e;border-radius:12px;width:284px;min-width:284px;display:flex;flex-direction:column;max-height:calc(100vh - 97px);border:2px solid transparent;transition:border-color .2s}
+    .column{background:#1a1d2e;border-radius:12px;width:284px;min-width:284px;display:flex;flex-direction:column;max-height:calc(100vh - 153px);border:2px solid transparent;transition:border-color .2s}
     .column.drag-over{border-color:#4f547a;background:#1e2240}
     .column.col-dragging{opacity:.5}
-
     .col-header{display:flex;align-items:center;gap:8px;padding:12px 12px 10px;border-bottom:1px solid #2d3148;cursor:grab}
     .col-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
     .col-title{flex:1;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;outline:none;background:transparent;border:none;cursor:text;min-width:0}
@@ -44,11 +64,6 @@
     .dropdown button:hover{background:#2d3148;color:#e2e8f0}
     .dropdown button.del:hover{color:#f87171}
 
-    /* Color picker strip */
-    .color-strip{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #2d3148}
-    .color-swatch{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
-    .color-swatch:hover,.color-swatch.active{border-color:#fff}
-
     /* ── Cards ── */
     .cards{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:7px}
     .cards::-webkit-scrollbar{width:3px}
@@ -60,7 +75,6 @@
     .card{background:#252840;border-radius:9px;padding:11px;cursor:grab;border:1px solid transparent;transition:border-color .15s,box-shadow .15s;position:relative}
     .card:hover{border-color:#3d4166;box-shadow:0 2px 8px #00000040}
     .card.dragging{opacity:.45;transform:rotate(1.5deg)}
-
     .card-title{font-size:13px;font-weight:500;line-height:1.45;margin-bottom:7px;padding-right:20px}
     .card-meta{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
     .badge{font-size:11px;padding:2px 6px;border-radius:4px;font-weight:500}
@@ -68,14 +82,20 @@
     .badge-dl{background:#1e3a5f;color:#60a5fa}
     .badge-dl.overdue{background:#3b1f1f;color:#f87171}
     .badge-del{background:#2d1f3b;color:#c084fc}
+    .badge-tag{background:#1e2a1e;color:#4ade80;cursor:pointer}
+    .badge-tag:hover{background:#2d3f2d}
+    .badge-col{background:#252840;color:#64748b;border:1px solid #3d4166}
     .pdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
     .p1{background:#f87171}.p2{background:#fbbf24}.p3{background:#4ade80}
     .card-del{position:absolute;top:7px;right:7px;background:none;border:none;color:#3d4166;font-size:14px;cursor:pointer;display:none;transition:color .15s}
     .card:hover .card-del{display:block}
     .card-del:hover{color:#f87171}
 
+    /* card в tags view — горизонтальнее */
+    .tag-group-cards .card{width:260px;cursor:default}
+
     /* ── Add column ── */
-    .add-col-btn{background:#1a1d2e;border:2px dashed #2d3148;border-radius:12px;width:220px;min-width:220px;height:60px;display:flex;align-items:center;justify-content:center;gap:8px;color:#4a5280;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;flex-shrink:0}
+    .add-col-btn{background:#1a1d2e;border:2px dashed #2d3148;border-radius:12px;width:220px;min-width:220px;height:60px;display:flex;align-items:center;justify-content:center;gap:8px;color:#4a5280;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;flex-shrink:0;align-self:flex-start;margin-top:0}
     .add-col-btn:hover{border-color:#a78bfa;color:#a78bfa;background:#1e1f35}
 
     /* ── Modal ── */
@@ -105,9 +125,17 @@
   </form>
 </header>
 
-<div class="board" id="board"></div>
+<div class="toolbar">
+  <div class="view-toggle">
+    <button class="view-btn active" data-view="columns">⬛ Колонки</button>
+    <button class="view-btn" data-view="tags">🏷 По тегам</button>
+  </div>
+  <div class="tag-filters" id="tagFilters"></div>
+</div>
 
-<!-- Modal: создать/редактировать колонку -->
+<div id="boardWrap"></div>
+
+<!-- Modal -->
 <div class="modal-bg" id="colModal">
   <div class="modal">
     <h2 id="modalTitle">Новая колонка</h2>
@@ -128,6 +156,8 @@ const COLORS = ['#94a3b8','#60a5fa','#4ade80','#f87171','#fbbf24','#a78bfa','#f4
 let dragTaskId = null, dragColId = null;
 let state = { columns: [], tasks: [] };
 let modalMode = null, modalEditId = null, selectedColor = COLORS[0];
+let currentView = 'columns';   // 'columns' | 'tags'
+let activeTag = null;           // выбранный тег для фильтра
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -136,22 +166,74 @@ async function load() {
     fetch(`${API}/columns`).then(r => r.json()),
     fetch(`${API}/tasks`).then(r => r.json()),
   ]);
-  state = { columns: cols || [], tasks: tasks || [] };
+  state = { columns: Array.isArray(cols) ? cols : [], tasks: Array.isArray(tasks) ? tasks : [] };
+  renderTagFilters();
   render();
 }
+
+// ── Tag filters bar ───────────────────────────────────────────────────────────
+
+function renderTagFilters() {
+  const all = new Set();
+  state.tasks.forEach(t => (t.tags || []).forEach(tag => all.add(tag)));
+  const tags = [...all].sort();
+
+  const el = document.getElementById('tagFilters');
+  if (!tags.length) { el.innerHTML = ''; return; }
+
+  el.innerHTML = `<span class="tag-filter-label">Теги:</span>` +
+    tags.map(tag =>
+      `<span class="tag-chip${activeTag === tag ? ' active' : ''}" data-tag="${esc(tag)}">#${esc(tag)}</span>`
+    ).join('') +
+    (activeTag ? `<span class="tag-chip clear" data-tag="">✕ сбросить</span>` : '');
+
+  el.querySelectorAll('.tag-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      activeTag = chip.dataset.tag || null;
+      renderTagFilters();
+      render();
+    });
+  });
+}
+
+// ── View toggle ───────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentView = btn.dataset.view;
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    render();
+  });
+});
 
 // ── Render ───────────────────────────────────────────────────────────────────
 
 function render() {
-  const board = document.getElementById('board');
-  board.innerHTML = '';
-  (state.columns || []).forEach(col => board.appendChild(makeColumn(col)));
-  board.appendChild(makeAddColBtn());
+  if (currentView === 'columns') renderColumns();
+  else renderTagsView();
 }
 
-function makeColumn(col) {
-  const tasks = state.tasks.filter(t => t.column_id === col.id);
+function filteredTasks() {
+  if (!activeTag) return state.tasks;
+  return state.tasks.filter(t => (t.tags || []).includes(activeTag));
+}
 
+// ── Columns view ──────────────────────────────────────────────────────────────
+
+function renderColumns() {
+  const wrap = document.getElementById('boardWrap');
+  wrap.innerHTML = '';
+  const board = document.createElement('div');
+  board.className = 'board';
+  const tasks = filteredTasks();
+  state.columns.forEach(col => board.appendChild(makeColumn(col, tasks)));
+  board.appendChild(makeAddColBtn());
+  wrap.appendChild(board);
+}
+
+function makeColumn(col, tasks) {
+  const colTasks = tasks.filter(t => t.column_id === col.id);
   const el = document.createElement('div');
   el.className = 'column';
   el.dataset.colId = col.id;
@@ -160,120 +242,137 @@ function makeColumn(col) {
     <div class="col-header" draggable="true">
       <span class="col-dot" style="background:${col.color}"></span>
       <div class="col-title" contenteditable="true" spellcheck="false">${esc(col.name)}</div>
-      <span class="col-count">${tasks.length}</span>
+      <span class="col-count">${colTasks.length}</span>
       <div class="col-menu">
-        <button class="col-menu-btn" title="Меню">⋯</button>
+        <button class="col-menu-btn">⋯</button>
         <div class="dropdown">
           <button data-action="edit">✏️ Переименовать</button>
-          <button data-action="del" class="del">🗑 Удалить колонку</button>
+          <button data-action="del" class="del">🗑 Удалить</button>
         </div>
       </div>
     </div>
     <div class="cards" data-col="${col.id}">
-      ${tasks.length === 0 ? '<div class="empty-state">Нет задач</div>' : ''}
-      ${tasks.map(t => makeCardHTML(t)).join('')}
+      ${colTasks.length === 0 ? '<div class="empty-state">Нет задач</div>' : ''}
+      ${colTasks.map(t => makeCardHTML(t, false)).join('')}
       <div class="drop-hint"></div>
-    </div>
-  `;
+    </div>`;
 
   // Rename inline
   const titleEl = el.querySelector('.col-title');
   titleEl.addEventListener('blur', async () => {
     const name = titleEl.textContent.trim();
     if (!name || name === col.name) return;
-    await fetch(`${API}/columns/${col.id}`, {
-      method: 'PUT',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ name, color: col.color })
-    });
+    await fetch(`${API}/columns/${col.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, color: col.color}) });
     col.name = name;
   });
-  titleEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
+  titleEl.addEventListener('keydown', e => { if (e.key==='Enter'){e.preventDefault();titleEl.blur();} });
 
   // Dropdown
   const menuBtn = el.querySelector('.col-menu-btn');
   const dropdown = el.querySelector('.dropdown');
   menuBtn.addEventListener('click', e => { e.stopPropagation(); dropdown.classList.toggle('open'); });
-  document.addEventListener('click', () => dropdown.classList.remove('open'), { capture: false });
-
+  document.addEventListener('click', () => dropdown.classList.remove('open'));
   dropdown.querySelector('[data-action="edit"]').addEventListener('click', () => openModal('edit', col));
   dropdown.querySelector('[data-action="del"]').addEventListener('click', () => deleteColumn(col));
 
   // Column drag
   const header = el.querySelector('.col-header');
-  header.addEventListener('dragstart', e => {
-    dragColId = col.id;
-    e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => el.classList.add('col-dragging'), 0);
-  });
-  header.addEventListener('dragend', () => {
-    el.classList.remove('col-dragging');
-    dragColId = null;
-  });
+  header.addEventListener('dragstart', e => { dragColId = col.id; e.dataTransfer.effectAllowed='move'; setTimeout(()=>el.classList.add('col-dragging'),0); });
+  header.addEventListener('dragend', () => { el.classList.remove('col-dragging'); dragColId = null; });
 
   el.addEventListener('dragover', e => {
     e.preventDefault();
-    if (dragColId && dragColId !== col.id) {
-      el.classList.add('drag-over');
-    } else if (dragTaskId) {
-      el.classList.add('drag-over');
-      el.querySelector('.drop-hint').classList.add('active');
-    }
+    if (dragColId && dragColId !== col.id) el.classList.add('drag-over');
+    else if (dragTaskId) { el.classList.add('drag-over'); el.querySelector('.drop-hint').classList.add('active'); }
   });
   el.addEventListener('dragleave', e => {
-    if (!el.contains(e.relatedTarget)) {
-      el.classList.remove('drag-over');
-      el.querySelector('.drop-hint')?.classList.remove('active');
-    }
+    if (!el.contains(e.relatedTarget)) { el.classList.remove('drag-over'); el.querySelector('.drop-hint')?.classList.remove('active'); }
   });
   el.addEventListener('drop', async e => {
     e.preventDefault();
     el.classList.remove('drag-over');
     el.querySelector('.drop-hint')?.classList.remove('active');
-
     if (dragTaskId) {
-      await fetch(`${API}/tasks/${dragTaskId}/column`, {
-        method: 'PATCH',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ column_id: col.id })
-      });
+      await fetch(`${API}/tasks/${dragTaskId}/column`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({column_id: col.id}) });
       load();
     } else if (dragColId && dragColId !== col.id) {
-      // Swap positions
-      const a = state.columns.find(c => c.id === dragColId);
-      const b = col;
+      const a = state.columns.find(c=>c.id===dragColId), b = col;
       await Promise.all([
-        fetch(`${API}/columns/${a.id}/position`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({position: b.position}) }),
-        fetch(`${API}/columns/${b.id}/position`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({position: a.position}) }),
+        fetch(`${API}/columns/${a.id}/position`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({position:b.position})}),
+        fetch(`${API}/columns/${b.id}/position`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({position:a.position})}),
       ]);
       load();
     }
   });
 
   // Card events
-  el.querySelectorAll('.card').forEach(card => {
-    const id = parseInt(card.dataset.id);
-    card.addEventListener('dragstart', e => {
-      dragTaskId = id;
-      e.dataTransfer.effectAllowed = 'move';
-      setTimeout(() => card.classList.add('dragging'), 0);
-    });
-    card.addEventListener('dragend', () => { card.classList.remove('dragging'); dragTaskId = null; });
-    card.querySelector('.card-del').addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (!confirm('Удалить задачу?')) return;
-      await fetch(`${API}/tasks/${id}`, { method: 'DELETE' });
-      toast('Удалено');
-      load();
-    });
-  });
-
+  el.querySelectorAll('.card').forEach(card => bindCardEvents(card));
   return el;
 }
 
-function makeCardHTML(t) {
+// ── Tags view ─────────────────────────────────────────────────────────────────
+
+function renderTagsView() {
+  const wrap = document.getElementById('boardWrap');
+  wrap.innerHTML = '';
+  const view = document.createElement('div');
+  view.className = 'tags-view';
+
+  const tasks = filteredTasks();
+  const tagMap = new Map(); // tag → tasks[]
+
+  // Задачи без тегов
+  const untagged = tasks.filter(t => !t.tags || t.tags.length === 0);
+
+  tasks.forEach(t => {
+    (t.tags || []).forEach(tag => {
+      if (!tagMap.has(tag)) tagMap.set(tag, []);
+      tagMap.get(tag).push(t);
+    });
+  });
+
+  if (!tagMap.size && !untagged.length) {
+    view.innerHTML = '<div style="text-align:center;color:#2d3148;padding:60px 0;font-size:14px">Нет задач с тегами</div>';
+    wrap.appendChild(view);
+    return;
+  }
+
+  // Рендерим группы по тегам
+  [...tagMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).forEach(([tag, tagTasks]) => {
+    view.appendChild(makeTagGroup(`#${tag}`, tagTasks));
+  });
+
+  if (untagged.length) {
+    view.appendChild(makeTagGroup('Без тега', untagged));
+  }
+
+  wrap.appendChild(view);
+}
+
+function makeTagGroup(name, tasks) {
+  const group = document.createElement('div');
+  group.className = 'tag-group';
+  group.innerHTML = `
+    <div class="tag-group-header">
+      <span class="tag-group-name">${esc(name)}</span>
+      <span class="tag-group-count">${tasks.length}</span>
+    </div>
+    <div class="tag-group-cards">
+      ${tasks.map(t => makeCardHTML(t, true)).join('')}
+    </div>`;
+  group.querySelectorAll('.card').forEach(card => bindCardEvents(card));
+  return group;
+}
+
+// ── Card HTML ─────────────────────────────────────────────────────────────────
+
+function makeCardHTML(t, showColumn) {
   const now = new Date();
   const overdue = t.deadline && new Date(t.deadline) < now ? 'overdue' : '';
+  const colName = showColumn ? (state.columns.find(c=>c.id===t.column_id)?.name || '') : '';
+  const tagsHTML = (t.tags||[]).map(tag =>
+    `<span class="badge badge-tag" data-tag="${esc(tag)}">#${esc(tag)}</span>`
+  ).join('');
   return `
     <div class="card" data-id="${t.id}" draggable="true">
       <button class="card-del" title="Удалить">✕</button>
@@ -283,8 +382,32 @@ function makeCardHTML(t) {
         <span class="badge badge-proj" style="border-left:3px solid ${t.project_color}">${esc(t.project_name)}</span>
         ${t.deadline ? `<span class="badge badge-dl ${overdue}">📅 ${esc(t.deadline)}</span>` : ''}
         ${t.delegated_to ? `<span class="badge badge-del">👤 ${esc(t.delegated_to)}</span>` : ''}
+        ${showColumn && colName ? `<span class="badge badge-col">⬛ ${esc(colName)}</span>` : ''}
+        ${tagsHTML}
       </div>
     </div>`;
+}
+
+function bindCardEvents(card) {
+  const id = parseInt(card.dataset.id);
+  card.addEventListener('dragstart', e => { dragTaskId=id; e.dataTransfer.effectAllowed='move'; setTimeout(()=>card.classList.add('dragging'),0); });
+  card.addEventListener('dragend', () => { card.classList.remove('dragging'); dragTaskId=null; });
+  card.querySelector('.card-del').addEventListener('click', async e => {
+    e.stopPropagation();
+    if (!confirm('Удалить задачу?')) return;
+    await fetch(`${API}/tasks/${id}`, {method:'DELETE'});
+    toast('Удалено');
+    load();
+  });
+  // Клик по тегу — фильтрация
+  card.querySelectorAll('.badge-tag').forEach(b => {
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      activeTag = b.dataset.tag;
+      renderTagFilters();
+      render();
+    });
+  });
 }
 
 function makeAddColBtn() {
@@ -295,105 +418,68 @@ function makeAddColBtn() {
   return btn;
 }
 
-// ── Modal ────────────────────────────────────────────────────────────────────
+// ── Modal ─────────────────────────────────────────────────────────────────────
 
-function openModal(mode, col = null) {
-  modalMode = mode;
-  modalEditId = col?.id ?? null;
-  selectedColor = col?.color ?? COLORS[0];
-
-  document.getElementById('modalTitle').textContent = mode === 'edit' ? 'Переименовать' : 'Новая колонка';
-  document.getElementById('colName').value = col?.name ?? '';
-
-  const colorsEl = document.getElementById('modalColors');
-  colorsEl.innerHTML = COLORS.map(c =>
-    `<div class="modal-swatch${c === selectedColor ? ' active' : ''}" style="background:${c}" data-color="${c}"></div>`
-  ).join('');
-  colorsEl.querySelectorAll('.modal-swatch').forEach(sw => {
-    sw.addEventListener('click', () => {
-      selectedColor = sw.dataset.color;
-      colorsEl.querySelectorAll('.modal-swatch').forEach(s => s.classList.remove('active'));
-      sw.classList.add('active');
-    });
+function openModal(mode, col=null) {
+  modalMode=mode; modalEditId=col?.id??null; selectedColor=col?.color??COLORS[0];
+  document.getElementById('modalTitle').textContent = mode==='edit' ? 'Переименовать' : 'Новая колонка';
+  document.getElementById('colName').value = col?.name??'';
+  const ce = document.getElementById('modalColors');
+  ce.innerHTML = COLORS.map(c=>`<div class="modal-swatch${c===selectedColor?' active':''}" style="background:${c}" data-color="${c}"></div>`).join('');
+  ce.querySelectorAll('.modal-swatch').forEach(sw=>{
+    sw.addEventListener('click',()=>{ selectedColor=sw.dataset.color; ce.querySelectorAll('.modal-swatch').forEach(s=>s.classList.remove('active')); sw.classList.add('active'); });
   });
-
   document.getElementById('colModal').classList.add('open');
-  setTimeout(() => document.getElementById('colName').focus(), 50);
+  setTimeout(()=>document.getElementById('colName').focus(),50);
 }
 
-function closeModal() { document.getElementById('colModal').classList.remove('open'); }
-
+function closeModal(){ document.getElementById('colModal').classList.remove('open'); }
 document.getElementById('modalCancel').addEventListener('click', closeModal);
-document.getElementById('colModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
-
-document.getElementById('modalSave').addEventListener('click', async () => {
+document.getElementById('colModal').addEventListener('click', e=>{ if(e.target===e.currentTarget) closeModal(); });
+document.getElementById('modalSave').addEventListener('click', async()=>{
   const name = document.getElementById('colName').value.trim();
-  if (!name) return;
-
-  if (modalMode === 'create') {
-    await fetch(`${API}/columns`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ name, color: selectedColor })
-    });
+  if(!name) return;
+  if(modalMode==='create'){
+    await fetch(`${API}/columns`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,color:selectedColor})});
     toast('Колонка создана');
   } else {
-    await fetch(`${API}/columns/${modalEditId}`, {
-      method: 'PUT', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ name, color: selectedColor })
-    });
+    await fetch(`${API}/columns/${modalEditId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,color:selectedColor})});
     toast('Сохранено');
   }
-  closeModal();
-  load();
+  closeModal(); load();
 });
-
-document.getElementById('colName').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('modalSave').click();
-  if (e.key === 'Escape') closeModal();
-});
-
-// ── Delete column ─────────────────────────────────────────────────────────────
+document.getElementById('colName').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('modalSave').click(); if(e.key==='Escape') closeModal(); });
 
 async function deleteColumn(col) {
-  const tasks = state.tasks.filter(t => t.column_id === col.id);
-  const msg = tasks.length
-    ? `В колонке "${col.name}" ${tasks.length} задач. Они будут удалены. Продолжить?`
-    : `Удалить колонку "${col.name}"?`;
-  if (!confirm(msg)) return;
-  await fetch(`${API}/columns/${col.id}`, { method: 'DELETE' });
-  toast('Колонка удалена');
-  load();
+  const tasks = state.tasks.filter(t=>t.column_id===col.id);
+  const msg = tasks.length ? `В колонке "${col.name}" ${tasks.length} задач. Они будут удалены. Продолжить?` : `Удалить колонку "${col.name}"?`;
+  if(!confirm(msg)) return;
+  await fetch(`${API}/columns/${col.id}`,{method:'DELETE'});
+  toast('Колонка удалена'); load();
 }
 
 // ── Add task ──────────────────────────────────────────────────────────────────
 
-document.getElementById('addForm').addEventListener('submit', async e => {
+document.getElementById('addForm').addEventListener('submit', async e=>{
   e.preventDefault();
   const input = document.getElementById('taskInput');
   const text = input.value.trim();
-  if (!text) return;
+  if(!text) return;
   const firstColId = state.columns[0]?.id ?? null;
-  await fetch(`${API}/tasks`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ text, column_id: firstColId })
-  });
-  input.value = '';
+  await fetch(`${API}/tasks`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,column_id:firstColId})});
+  input.value='';
   toast('✅ Задача создана');
   load();
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
 }
-
-function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 load();
 setInterval(load, 30000);

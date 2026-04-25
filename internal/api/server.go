@@ -65,15 +65,16 @@ func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type taskResp struct {
-		ID           int64   `json:"id"`
-		Title        string  `json:"title"`
-		Notes        *string `json:"notes"`
-		Priority     int16   `json:"priority"`
-		Deadline     *string `json:"deadline"`
-		ColumnID     int64   `json:"column_id"`
-		ProjectName  string  `json:"project_name"`
-		ProjectColor string  `json:"project_color"`
-		DelegatedTo  *string `json:"delegated_to"`
+		ID           int64    `json:"id"`
+		Title        string   `json:"title"`
+		Notes        *string  `json:"notes"`
+		Priority     int16    `json:"priority"`
+		Deadline     *string  `json:"deadline"`
+		ColumnID     int64    `json:"column_id"`
+		ProjectName  string   `json:"project_name"`
+		ProjectColor string   `json:"project_color"`
+		DelegatedTo  *string  `json:"delegated_to"`
+		Tags         []string `json:"tags"`
 	}
 	resp := make([]taskResp, len(tasks))
 	for i, t := range tasks {
@@ -82,11 +83,25 @@ func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
 			s := t.Deadline.Time.Format("02 Jan 15:04")
 			dl = &s
 		}
+		var tags []string
+		switch v := t.Tags.(type) {
+		case []string:
+			tags = v
+		case []interface{}:
+			for _, tag := range v {
+				if s, ok := tag.(string); ok {
+					tags = append(tags, s)
+				}
+			}
+		}
+		if tags == nil {
+			tags = []string{}
+		}
 		resp[i] = taskResp{
 			ID: t.ID, Title: t.Title, Notes: t.Notes,
 			Priority: t.Priority, Deadline: dl, ColumnID: t.ColumnID,
 			ProjectName: t.ProjectName, ProjectColor: t.ProjectColor,
-			DelegatedTo: t.DelegatedTo,
+			DelegatedTo: t.DelegatedTo, Tags: tags,
 		}
 	}
 	jsonOK(w, resp)
