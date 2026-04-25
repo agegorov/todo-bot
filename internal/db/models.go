@@ -8,6 +8,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type BoardColumn struct {
+	ID        int64              `json:"id"`
+	Name      string             `json:"name"`
+	Color     string             `json:"color"`
+	Position  int32              `json:"position"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type Project struct {
 	ID        int64              `json:"id"`
 	Name      string             `json:"name"`
@@ -39,7 +47,7 @@ type Task struct {
 	IsRecurring bool               `json:"is_recurring"`
 	RecurRule   *string            `json:"recur_rule"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	Status      string             `json:"status"`
+	ColumnID    int64              `json:"column_id"`
 }
 
 type TaskTag struct {

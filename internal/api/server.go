@@ -29,79 +29,80 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"GET", "POST", "PATCH", "DELETE"},
+		AllowedMethods: []string{"GET", "POST", "PATCH", "PUT", "DELETE"},
 		AllowedHeaders: []string{"Content-Type"},
 	}))
 
-	// Статические файлы
 	r.Handle("/*", http.FileServer(http.Dir("web")))
 
-	// API
 	r.Route("/api", func(r chi.Router) {
+		// Tasks
 		r.Get("/tasks", s.listTasks)
 		r.Post("/tasks", s.createTask)
-		r.Patch("/tasks/{id}/status", s.updateStatus)
+		r.Patch("/tasks/{id}/column", s.moveTask)
 		r.Delete("/tasks/{id}", s.deleteTask)
+
+		// Columns
+		r.Get("/columns", s.listColumns)
+		r.Post("/columns", s.createColumn)
+		r.Put("/columns/{id}", s.updateColumn)
+		r.Delete("/columns/{id}", s.deleteColumn)
+		r.Patch("/columns/{id}/position", s.reorderColumn)
+
+		// Projects
 		r.Get("/projects", s.listProjects)
 	})
 
 	return r
 }
 
-// GET /api/tasks
+// ── Tasks ────────────────────────────────────────────────────────────────────
+
 func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
-	tasks, err := s.queries.ListTasksByStatus(r.Context())
+	tasks, err := s.queries.ListTasksForBoard(r.Context())
 	if err != nil {
 		jsonError(w, err, 500)
 		return
 	}
-
-	type taskResponse struct {
-		ID          int64   `json:"id"`
-		Title       string  `json:"title"`
-		Notes       *string `json:"notes"`
-		Priority    int16   `json:"priority"`
-		Deadline    *string `json:"deadline"`
-		Status      string  `json:"status"`
-		ProjectName string  `json:"project_name"`
-		ProjectColor string `json:"project_color"`
-		DelegatedTo *string `json:"delegated_to"`
+	type taskResp struct {
+		ID           int64   `json:"id"`
+		Title        string  `json:"title"`
+		Notes        *string `json:"notes"`
+		Priority     int16   `json:"priority"`
+		Deadline     *string `json:"deadline"`
+		ColumnID     int64   `json:"column_id"`
+		ProjectName  string  `json:"project_name"`
+		ProjectColor string  `json:"project_color"`
+		DelegatedTo  *string `json:"delegated_to"`
 	}
-
-	resp := make([]taskResponse, len(tasks))
+	resp := make([]taskResp, len(tasks))
 	for i, t := range tasks {
 		var dl *string
 		if t.Deadline.Valid {
 			s := t.Deadline.Time.Format("02 Jan 15:04")
 			dl = &s
 		}
-		resp[i] = taskResponse{
-			ID:           t.ID,
-			Title:        t.Title,
-			Notes:        t.Notes,
-			Priority:     t.Priority,
-			Deadline:     dl,
-			Status:       t.Status,
-			ProjectName:  t.ProjectName,
-			ProjectColor: t.ProjectColor,
-			DelegatedTo:  t.DelegatedTo,
+		resp[i] = taskResp{
+			ID: t.ID, Title: t.Title, Notes: t.Notes,
+			Priority: t.Priority, Deadline: dl, ColumnID: t.ColumnID,
+			ProjectName: t.ProjectName, ProjectColor: t.ProjectColor,
+			DelegatedTo: t.DelegatedTo,
 		}
 	}
 	jsonOK(w, resp)
 }
 
-// POST /api/tasks
 func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Text string `json:"text"`
+		Text     string `json:"text"`
+		ColumnID int64  `json:"column_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Text == "" {
-		jsonError(w, err, 400)
+		jsonError(w, nil, 400)
 		return
 	}
 
 	parsed := parser.Parse(body.Text, time.Now())
-
 	projects, _ := s.queries.ListProjects(r.Context())
 	projectID := int64(1)
 	for _, p := range projects {
@@ -140,32 +141,32 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err, 500)
 		return
 	}
+
+	// Перемещаем в нужную колонку если указана
+	if body.ColumnID > 0 {
+		_ = s.queries.MoveTaskToColumn(r.Context(), db.MoveTaskToColumnParams{
+			ID: task.ID, ColumnID: body.ColumnID,
+		})
+	}
+
 	jsonOK(w, task)
 }
 
-// PATCH /api/tasks/{id}/status
-func (s *Server) updateStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) moveTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		jsonError(w, err, 400)
 		return
 	}
 	var body struct {
-		Status string `json:"status"`
+		ColumnID int64 `json:"column_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonError(w, err, 400)
 		return
 	}
-	if body.Status == "done" {
-		if err := s.queries.CompleteTask(r.Context(), id); err != nil {
-			jsonError(w, err, 500)
-			return
-		}
-	}
-	if err := s.queries.UpdateTaskStatus(r.Context(), db.UpdateTaskStatusParams{
-		ID:     id,
-		Status: body.Status,
+	if err := s.queries.MoveTaskToColumn(r.Context(), db.MoveTaskToColumnParams{
+		ID: id, ColumnID: body.ColumnID,
 	}); err != nil {
 		jsonError(w, err, 500)
 		return
@@ -173,13 +174,8 @@ func (s *Server) updateStatus(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// DELETE /api/tasks/{id}
 func (s *Server) deleteTask(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		jsonError(w, err, 400)
-		return
-	}
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err := s.queries.DeleteTask(r.Context(), id); err != nil {
 		jsonError(w, err, 500)
 		return
@@ -187,7 +183,87 @@ func (s *Server) deleteTask(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// GET /api/projects
+// ── Columns ──────────────────────────────────────────────────────────────────
+
+func (s *Server) listColumns(w http.ResponseWriter, r *http.Request) {
+	cols, err := s.queries.ListColumns(r.Context())
+	if err != nil {
+		jsonError(w, err, 500)
+		return
+	}
+	jsonOK(w, cols)
+}
+
+func (s *Server) createColumn(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" {
+		jsonError(w, nil, 400)
+		return
+	}
+	if body.Color == "" {
+		body.Color = "#94a3b8"
+	}
+	col, err := s.queries.CreateColumn(r.Context(), db.CreateColumnParams{
+		Name: body.Name, Color: body.Color,
+	})
+	if err != nil {
+		jsonError(w, err, 500)
+		return
+	}
+	jsonOK(w, col)
+}
+
+func (s *Server) updateColumn(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var body struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" {
+		jsonError(w, nil, 400)
+		return
+	}
+	if err := s.queries.UpdateColumn(r.Context(), db.UpdateColumnParams{
+		ID: id, Name: body.Name, Color: body.Color,
+	}); err != nil {
+		jsonError(w, err, 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) deleteColumn(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err := s.queries.DeleteColumn(r.Context(), id); err != nil {
+		jsonError(w, err, 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) reorderColumn(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var body struct {
+		Position int32 `json:"position"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, err, 400)
+		return
+	}
+	if err := s.queries.ReorderColumns(r.Context(), db.ReorderColumnsParams{
+		ID: id, Position: body.Position,
+	}); err != nil {
+		jsonError(w, err, 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Projects ─────────────────────────────────────────────────────────────────
+
 func (s *Server) listProjects(w http.ResponseWriter, r *http.Request) {
 	projects, err := s.queries.ListProjects(r.Context())
 	if err != nil {
@@ -197,6 +273,8 @@ func (s *Server) listProjects(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, projects)
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 func jsonOK(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
@@ -205,7 +283,7 @@ func jsonOK(w http.ResponseWriter, v any) {
 func jsonError(w http.ResponseWriter, err error, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	msg := "unknown error"
+	msg := "error"
 	if err != nil {
 		msg = err.Error()
 	}

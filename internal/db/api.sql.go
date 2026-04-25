@@ -11,51 +11,72 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getTaskByID = `-- name: GetTaskByID :one
-SELECT t.id, t.title, t.notes, t.priority, t.deadline, t.status,
-       t.delegated_to, t.is_recurring, t.created_at,
-       p.name AS project_name, p.color AS project_color
-FROM tasks t
-JOIN projects p ON p.id = t.project_id
-WHERE t.id = $1
+const createColumn = `-- name: CreateColumn :one
+INSERT INTO board_columns (name, color, position)
+VALUES ($1, $2, (SELECT COALESCE(MAX(position),0)+1 FROM board_columns))
+RETURNING id, name, color, position, created_at
 `
 
-type GetTaskByIDRow struct {
-	ID           int64              `json:"id"`
-	Title        string             `json:"title"`
-	Notes        *string            `json:"notes"`
-	Priority     int16              `json:"priority"`
-	Deadline     pgtype.Timestamptz `json:"deadline"`
-	Status       string             `json:"status"`
-	DelegatedTo  *string            `json:"delegated_to"`
-	IsRecurring  bool               `json:"is_recurring"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	ProjectName  string             `json:"project_name"`
-	ProjectColor string             `json:"project_color"`
+type CreateColumnParams struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
 }
 
-func (q *Queries) GetTaskByID(ctx context.Context, id int64) (GetTaskByIDRow, error) {
-	row := q.db.QueryRow(ctx, getTaskByID, id)
-	var i GetTaskByIDRow
+func (q *Queries) CreateColumn(ctx context.Context, arg CreateColumnParams) (BoardColumn, error) {
+	row := q.db.QueryRow(ctx, createColumn, arg.Name, arg.Color)
+	var i BoardColumn
 	err := row.Scan(
 		&i.ID,
-		&i.Title,
-		&i.Notes,
-		&i.Priority,
-		&i.Deadline,
-		&i.Status,
-		&i.DelegatedTo,
-		&i.IsRecurring,
+		&i.Name,
+		&i.Color,
+		&i.Position,
 		&i.CreatedAt,
-		&i.ProjectName,
-		&i.ProjectColor,
 	)
 	return i, err
 }
 
-const listTasksByStatus = `-- name: ListTasksByStatus :many
-SELECT t.id, t.title, t.notes, t.priority, t.deadline, t.status,
-       t.delegated_to, t.is_recurring, t.created_at,
+const deleteColumn = `-- name: DeleteColumn :exec
+DELETE FROM board_columns WHERE id = $1
+`
+
+func (q *Queries) DeleteColumn(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, deleteColumn, id)
+	return err
+}
+
+const listColumns = `-- name: ListColumns :many
+SELECT id, name, color, position, created_at FROM board_columns ORDER BY position, id
+`
+
+func (q *Queries) ListColumns(ctx context.Context) ([]BoardColumn, error) {
+	rows, err := q.db.Query(ctx, listColumns)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BoardColumn
+	for rows.Next() {
+		var i BoardColumn
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Color,
+			&i.Position,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTasksForBoard = `-- name: ListTasksForBoard :many
+SELECT t.id, t.title, t.notes, t.priority, t.deadline,
+       t.column_id, t.delegated_to, t.is_recurring, t.created_at,
        p.name AS project_name, p.color AS project_color
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
@@ -63,13 +84,13 @@ WHERE t.done_at IS NULL
 ORDER BY t.priority, t.deadline NULLS LAST, t.created_at
 `
 
-type ListTasksByStatusRow struct {
+type ListTasksForBoardRow struct {
 	ID           int64              `json:"id"`
 	Title        string             `json:"title"`
 	Notes        *string            `json:"notes"`
 	Priority     int16              `json:"priority"`
 	Deadline     pgtype.Timestamptz `json:"deadline"`
-	Status       string             `json:"status"`
+	ColumnID     int64              `json:"column_id"`
 	DelegatedTo  *string            `json:"delegated_to"`
 	IsRecurring  bool               `json:"is_recurring"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
@@ -77,22 +98,22 @@ type ListTasksByStatusRow struct {
 	ProjectColor string             `json:"project_color"`
 }
 
-func (q *Queries) ListTasksByStatus(ctx context.Context) ([]ListTasksByStatusRow, error) {
-	rows, err := q.db.Query(ctx, listTasksByStatus)
+func (q *Queries) ListTasksForBoard(ctx context.Context) ([]ListTasksForBoardRow, error) {
+	rows, err := q.db.Query(ctx, listTasksForBoard)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListTasksByStatusRow
+	var items []ListTasksForBoardRow
 	for rows.Next() {
-		var i ListTasksByStatusRow
+		var i ListTasksForBoardRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
 			&i.Notes,
 			&i.Priority,
 			&i.Deadline,
-			&i.Status,
+			&i.ColumnID,
 			&i.DelegatedTo,
 			&i.IsRecurring,
 			&i.CreatedAt,
@@ -109,16 +130,45 @@ func (q *Queries) ListTasksByStatus(ctx context.Context) ([]ListTasksByStatusRow
 	return items, nil
 }
 
-const updateTaskStatus = `-- name: UpdateTaskStatus :exec
-UPDATE tasks SET status = $2 WHERE id = $1
+const moveTaskToColumn = `-- name: MoveTaskToColumn :exec
+UPDATE tasks SET column_id = $2 WHERE id = $1
 `
 
-type UpdateTaskStatusParams struct {
-	ID     int64  `json:"id"`
-	Status string `json:"status"`
+type MoveTaskToColumnParams struct {
+	ID       int64 `json:"id"`
+	ColumnID int64 `json:"column_id"`
 }
 
-func (q *Queries) UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error {
-	_, err := q.db.Exec(ctx, updateTaskStatus, arg.ID, arg.Status)
+func (q *Queries) MoveTaskToColumn(ctx context.Context, arg MoveTaskToColumnParams) error {
+	_, err := q.db.Exec(ctx, moveTaskToColumn, arg.ID, arg.ColumnID)
+	return err
+}
+
+const reorderColumns = `-- name: ReorderColumns :exec
+UPDATE board_columns SET position = $2 WHERE id = $1
+`
+
+type ReorderColumnsParams struct {
+	ID       int64 `json:"id"`
+	Position int32 `json:"position"`
+}
+
+func (q *Queries) ReorderColumns(ctx context.Context, arg ReorderColumnsParams) error {
+	_, err := q.db.Exec(ctx, reorderColumns, arg.ID, arg.Position)
+	return err
+}
+
+const updateColumn = `-- name: UpdateColumn :exec
+UPDATE board_columns SET name = $2, color = $3 WHERE id = $1
+`
+
+type UpdateColumnParams struct {
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
+func (q *Queries) UpdateColumn(ctx context.Context, arg UpdateColumnParams) error {
+	_, err := q.db.Exec(ctx, updateColumn, arg.ID, arg.Name, arg.Color)
 	return err
 }
