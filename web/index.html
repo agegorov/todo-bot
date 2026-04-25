@@ -87,9 +87,12 @@
     .badge-col{background:#252840;color:#64748b;border:1px solid #3d4166}
     .pdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
     .p1{background:#f87171}.p2{background:#fbbf24}.p3{background:#4ade80}
-    .card-del{position:absolute;top:7px;right:7px;background:none;border:none;color:#3d4166;font-size:14px;cursor:pointer;display:none;transition:color .15s}
-    .card:hover .card-del{display:block}
+    .card-del,.card-edit{position:absolute;background:none;border:none;font-size:13px;cursor:pointer;display:none;transition:color .15s}
+    .card-del{top:7px;right:7px;color:#3d4166}
+    .card-edit{top:7px;right:26px;color:#3d4166}
+    .card:hover .card-del,.card:hover .card-edit{display:block}
     .card-del:hover{color:#f87171}
+    .card-edit:hover{color:#a78bfa}
 
     /* card в tags view — горизонтальнее */
     .tag-group-cards .card{width:260px;cursor:default}
@@ -109,6 +112,24 @@
     .modal-swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
     .modal-swatch:hover,.modal-swatch.active{border-color:#fff}
     .modal-actions{display:flex;gap:8px;justify-content:flex-end}
+
+    /* ── Edit modal ── */
+    .edit-modal .modal{width:420px}
+    .edit-modal label{display:block;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+    .edit-modal .field{margin-bottom:14px}
+    .edit-modal input,.edit-modal textarea{width:100%;background:#252840;border:1px solid #3d4166;border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;outline:none;resize:vertical}
+    .edit-modal input:focus,.edit-modal textarea:focus{border-color:#a78bfa}
+    .priority-btns{display:flex;gap:6px}
+    .priority-btn{flex:1;background:#252840;border:1px solid #3d4166;border-radius:7px;padding:6px;color:#64748b;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
+    .priority-btn.active-1{background:#3b1f1f;border-color:#f87171;color:#f87171}
+    .priority-btn.active-2{background:#2d2510;border-color:#fbbf24;color:#fbbf24}
+    .priority-btn.active-3{background:#1a2e1a;border-color:#4ade80;color:#4ade80}
+    .tags-input-wrap{display:flex;flex-wrap:wrap;gap:6px;background:#252840;border:1px solid #3d4166;border-radius:8px;padding:7px 10px;cursor:text;transition:border-color .2s}
+    .tags-input-wrap:focus-within{border-color:#a78bfa}
+    .tag-pill{display:flex;align-items:center;gap:4px;background:#2d1f3b;border-radius:20px;padding:2px 8px;font-size:12px;color:#a78bfa}
+    .tag-pill button{background:none;border:none;color:#a78bfa;cursor:pointer;font-size:13px;line-height:1;padding:0}
+    .tag-pill button:hover{color:#f87171}
+    .tags-input{background:none;border:none;outline:none;color:#e2e8f0;font-size:13px;min-width:80px;flex:1}
 
     /* ── Toast ── */
     .toast{position:fixed;bottom:20px;right:20px;background:#252840;border:1px solid #3d4166;border-radius:10px;padding:10px 16px;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;z-index:300}
@@ -144,6 +165,43 @@
     <div class="modal-actions">
       <button class="btn secondary" id="modalCancel">Отмена</button>
       <button class="btn" id="modalSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit task modal -->
+<div class="modal-bg edit-modal" id="editModal">
+  <div class="modal">
+    <h2>Редактировать задачу</h2>
+    <div class="field">
+      <label>Название</label>
+      <input id="editTitle" placeholder="Название задачи">
+    </div>
+    <div class="field">
+      <label>Заметки</label>
+      <textarea id="editNotes" rows="2" placeholder="Дополнительно..."></textarea>
+    </div>
+    <div class="field">
+      <label>Приоритет</label>
+      <div class="priority-btns">
+        <button class="priority-btn" data-p="1">🔴 Высокий</button>
+        <button class="priority-btn" data-p="2">🟡 Средний</button>
+        <button class="priority-btn" data-p="3">🟢 Низкий</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Дедлайн</label>
+      <input type="datetime-local" id="editDeadline">
+    </div>
+    <div class="field">
+      <label>Теги</label>
+      <div class="tags-input-wrap" id="tagsWrap">
+        <input class="tags-input" id="tagsInput" placeholder="Введи тег и нажми Enter">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="editCancel">Отмена</button>
+      <button class="btn" id="editSave">Сохранить</button>
     </div>
   </div>
 </div>
@@ -375,6 +433,7 @@ function makeCardHTML(t, showColumn) {
   ).join('');
   return `
     <div class="card" data-id="${t.id}" draggable="true">
+      <button class="card-edit" title="Редактировать">✏️</button>
       <button class="card-del" title="Удалить">✕</button>
       <div class="card-title">${esc(t.title)}</div>
       <div class="card-meta">
@@ -392,6 +451,7 @@ function bindCardEvents(card) {
   const id = parseInt(card.dataset.id);
   card.addEventListener('dragstart', e => { dragTaskId=id; e.dataTransfer.effectAllowed='move'; setTimeout(()=>card.classList.add('dragging'),0); });
   card.addEventListener('dragend', () => { card.classList.remove('dragging'); dragTaskId=null; });
+
   card.querySelector('.card-del').addEventListener('click', async e => {
     e.stopPropagation();
     if (!confirm('Удалить задачу?')) return;
@@ -399,6 +459,14 @@ function bindCardEvents(card) {
     toast('Удалено');
     load();
   });
+
+  card.querySelector('.card-edit').addEventListener('click', e => {
+    e.stopPropagation();
+    const task = state.tasks.find(t => t.id === id);
+    if (!task) return;
+    openEditModal(task);
+  });
+
   // Клик по тегу — фильтрация
   card.querySelectorAll('.badge-tag').forEach(b => {
     b.addEventListener('click', e => {
@@ -480,6 +548,90 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'),2200);
 }
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Edit task modal ───────────────────────────────────────────────────────────
+
+let editTaskId = null;
+let editTags = [];
+let editPriority = 2;
+
+function openEditModal(task) {
+  editTaskId = task.id;
+  editTags = [...(task.tags || [])];
+  editPriority = task.priority || 2;
+
+  document.getElementById('editTitle').value = task.title || '';
+  document.getElementById('editNotes').value = task.notes || '';
+  document.getElementById('editDeadline').value = task.deadlineRaw || '';
+
+  renderEditTags();
+  renderPriorityBtns();
+
+  document.getElementById('editModal').classList.add('open');
+  setTimeout(() => document.getElementById('editTitle').focus(), 50);
+}
+
+function renderEditTags() {
+  const wrap = document.getElementById('tagsWrap');
+  const input = document.getElementById('tagsInput');
+  wrap.innerHTML = '';
+  editTags.forEach(tag => {
+    const pill = document.createElement('span');
+    pill.className = 'tag-pill';
+    pill.innerHTML = `#${esc(tag)} <button data-tag="${esc(tag)}">×</button>`;
+    pill.querySelector('button').addEventListener('click', () => {
+      editTags = editTags.filter(t => t !== tag);
+      renderEditTags();
+    });
+    wrap.appendChild(pill);
+  });
+  wrap.appendChild(input);
+  wrap.addEventListener('click', () => input.focus());
+}
+
+function renderPriorityBtns() {
+  document.querySelectorAll('.priority-btn').forEach(btn => {
+    const p = parseInt(btn.dataset.p);
+    btn.className = 'priority-btn' + (p === editPriority ? ` active-${p}` : '');
+    btn.addEventListener('click', () => { editPriority = p; renderPriorityBtns(); });
+  });
+}
+
+document.getElementById('tagsInput').addEventListener('keydown', e => {
+  const val = e.target.value.trim().replace(/^#/, '');
+  if ((e.key === 'Enter' || e.key === ',') && val) {
+    e.preventDefault();
+    if (!editTags.includes(val)) editTags.push(val);
+    e.target.value = '';
+    renderEditTags();
+  }
+  if (e.key === 'Backspace' && !e.target.value && editTags.length) {
+    editTags.pop();
+    renderEditTags();
+  }
+});
+
+document.getElementById('editCancel').addEventListener('click', () => document.getElementById('editModal').classList.remove('open'));
+document.getElementById('editModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.target.classList.remove('open'); });
+
+document.getElementById('editSave').addEventListener('click', async () => {
+  const title = document.getElementById('editTitle').value.trim();
+  if (!title) return;
+  await fetch(`${API}/tasks/${editTaskId}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      title,
+      notes: document.getElementById('editNotes').value.trim(),
+      priority: editPriority,
+      deadline: document.getElementById('editDeadline').value || '',
+      tags: editTags,
+    })
+  });
+  document.getElementById('editModal').classList.remove('open');
+  toast('✅ Сохранено');
+  load();
+});
 
 load();
 setInterval(load, 30000);

@@ -44,6 +44,15 @@ func (q *Queries) DeleteColumn(ctx context.Context, id int64) error {
 	return err
 }
 
+const deleteTaskTags = `-- name: DeleteTaskTags :exec
+DELETE FROM task_tags WHERE task_id = $1
+`
+
+func (q *Queries) DeleteTaskTags(ctx context.Context, taskID int64) error {
+	_, err := q.db.Exec(ctx, deleteTaskTags, taskID)
+	return err
+}
+
 const listColumns = `-- name: ListColumns :many
 SELECT id, name, color, position, created_at FROM board_columns ORDER BY position, id
 `
@@ -176,5 +185,28 @@ type UpdateColumnParams struct {
 
 func (q *Queries) UpdateColumn(ctx context.Context, arg UpdateColumnParams) error {
 	_, err := q.db.Exec(ctx, updateColumn, arg.ID, arg.Name, arg.Color)
+	return err
+}
+
+const updateTask = `-- name: UpdateTask :exec
+UPDATE tasks SET title = $2, notes = $3, priority = $4, deadline = $5 WHERE id = $1
+`
+
+type UpdateTaskParams struct {
+	ID       int64              `json:"id"`
+	Title    string             `json:"title"`
+	Notes    *string            `json:"notes"`
+	Priority int16              `json:"priority"`
+	Deadline pgtype.Timestamptz `json:"deadline"`
+}
+
+func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
+	_, err := q.db.Exec(ctx, updateTask,
+		arg.ID,
+		arg.Title,
+		arg.Notes,
+		arg.Priority,
+		arg.Deadline,
+	)
 	return err
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -39,6 +40,7 @@ func (s *Server) Router() http.Handler {
 		// Tasks
 		r.Get("/tasks", s.listTasks)
 		r.Post("/tasks", s.createTask)
+		r.Put("/tasks/{id}", s.updateTask)
 		r.Patch("/tasks/{id}/column", s.moveTask)
 		r.Delete("/tasks/{id}", s.deleteTask)
 
@@ -165,6 +167,70 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, task)
+}
+
+func (s *Server) updateTask(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		jsonError(w, err, 400)
+		return
+	}
+	var body struct {
+		Title    string   `json:"title"`
+		Notes    string   `json:"notes"`
+		Priority int16    `json:"priority"`
+		Deadline string   `json:"deadline"` // "2006-01-02T15:04" or ""
+		Tags     []string `json:"tags"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Title == "" {
+		jsonError(w, nil, 400)
+		return
+	}
+
+	var deadline pgtype.Timestamptz
+	if body.Deadline != "" {
+		t, err := time.Parse("2006-01-02T15:04", body.Deadline)
+		if err == nil {
+			deadline = pgtype.Timestamptz{Time: t, Valid: true}
+		}
+	}
+
+	priority := body.Priority
+	if priority == 0 {
+		priority = 2
+	}
+
+	var notes *string
+	if body.Notes != "" {
+		notes = &body.Notes
+	}
+
+	if err := s.queries.UpdateTask(r.Context(), db.UpdateTaskParams{
+		ID:       id,
+		Title:    body.Title,
+		Notes:    notes,
+		Priority: priority,
+		Deadline: deadline,
+	}); err != nil {
+		jsonError(w, err, 500)
+		return
+	}
+
+	// Обновляем теги: удаляем старые, добавляем новые
+	_ = s.queries.DeleteTaskTags(r.Context(), id)
+	for _, tagName := range body.Tags {
+		tagName = strings.TrimSpace(strings.TrimPrefix(tagName, "#"))
+		if tagName == "" {
+			continue
+		}
+		tag, err := s.queries.UpsertTag(r.Context(), tagName)
+		if err != nil {
+			continue
+		}
+		_ = s.queries.AttachTag(r.Context(), db.AttachTagParams{TaskID: id, TagID: tag.ID})
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) moveTask(w http.ResponseWriter, r *http.Request) {

@@ -30,3 +30,9 @@ DELETE FROM board_columns WHERE id = $1;
 
 -- name: ReorderColumns :exec
 UPDATE board_columns SET position = $2 WHERE id = $1;
+
+-- name: UpdateTask :exec
+UPDATE tasks SET title = $2, notes = $3, priority = $4, deadline = $5 WHERE id = $1;
+
+-- name: DeleteTaskTags :exec
+DELETE FROM task_tags WHERE task_id = $1;
