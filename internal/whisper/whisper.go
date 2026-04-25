@@ -9,39 +9,41 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
-// Client calls a self-hosted whisper.cpp HTTP server.
-// Compatible with https://github.com/ggerganov/whisper.cpp server mode.
 type Client struct {
 	endpoint string
 	http     *http.Client
 }
 
 func New(endpoint string) *Client {
-	return &Client{
-		endpoint: endpoint,
-		http:     &http.Client{},
-	}
+	return &Client{endpoint: endpoint, http: &http.Client{}}
 }
 
 type transcribeResponse struct {
 	Text string `json:"text"`
 }
 
-// Transcribe sends an audio file to whisper server and returns Russian text.
+// Transcribe конвертирует аудио в WAV и отправляет на whisper сервер.
 func (c *Client) Transcribe(ctx context.Context, audioPath string) (string, error) {
-	f, err := os.Open(audioPath)
+	wavPath, err := convertToWav(audioPath)
 	if err != nil {
-		return "", fmt.Errorf("open audio: %w", err)
+		return "", fmt.Errorf("конвертация аудио: %w", err)
+	}
+	defer os.Remove(wavPath)
+
+	f, err := os.Open(wavPath)
+	if err != nil {
+		return "", fmt.Errorf("open wav: %w", err)
 	}
 	defer f.Close()
 
 	body := &bytes.Buffer{}
 	w := multipart.NewWriter(body)
-
-	part, err := w.CreateFormFile("file", filepath.Base(audioPath))
+	part, err := w.CreateFormFile("file", filepath.Base(wavPath))
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +73,24 @@ func (c *Client) Transcribe(ctx context.Context, audioPath string) (string, erro
 
 	var result transcribeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("decode whisper response: %w", err)
+		return "", fmt.Errorf("decode response: %w", err)
 	}
-	return result.Text, nil
+	return strings.TrimSpace(result.Text), nil
+}
+
+// convertToWav конвертирует OGG/Opus (Telegram) → WAV 16kHz mono через ffmpeg.
+func convertToWav(src string) (string, error) {
+	dst := strings.TrimSuffix(src, filepath.Ext(src)) + ".wav"
+	cmd := exec.Command("ffmpeg",
+		"-y",           // перезаписать если есть
+		"-i", src,      // входной файл
+		"-ar", "16000", // 16kHz — оптимально для whisper
+		"-ac", "1",     // моно
+		"-f", "wav",
+		dst,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("ffmpeg: %w\n%s", err, out)
+	}
+	return dst, nil
 }
