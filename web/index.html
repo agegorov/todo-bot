@@ -13,7 +13,10 @@
       --accent:#a78bfa;--accent2:#8b5cf6;
       --drag-over:#1e2240;--drag-border:#4f547a;
       --card-shadow:#00000040;
-      --badge-proj-bg:#1e2240;--badge-dl-bg:#1e3a5f;--badge-del-bg:#2d1f3b;--badge-tag-bg:#1e2a1e;
+      --badge-proj-bg:#1e2240;--badge-proj-color:#64748b;
+      --badge-dl-bg:#1e3a5f;--badge-dl-color:#60a5fa;
+      --badge-del-bg:#2d1f3b;--badge-del-color:#c084fc;
+      --badge-tag-bg:#1e2a1e;--badge-tag-color:#4ade80;
     }
     [data-theme="light"]{
       --bg:#f0f2f8;--bg2:#ffffff;--bg3:#f7f8fc;--bg4:#e8eaf4;
@@ -22,7 +25,10 @@
       --accent:#7c3aed;--accent2:#6d28d9;
       --drag-over:#ede9fe;--drag-border:#7c3aed;
       --card-shadow:#00000018;
-      --badge-proj-bg:#ede9fe;--badge-dl-bg:#dbeafe;--badge-del-bg:#f3e8ff;--badge-tag-bg:#dcfce7;
+      --badge-proj-bg:#ede9fe;--badge-proj-color:#4a5280;
+      --badge-dl-bg:#dbeafe;--badge-dl-color:#1d4ed8;
+      --badge-del-bg:#f3e8ff;--badge-del-color:#7c3aed;
+      --badge-tag-bg:#dcfce7;--badge-tag-color:#16a34a;
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -99,15 +105,12 @@
     .card-title{font-size:13px;font-weight:500;line-height:1.45;margin-bottom:7px;padding-right:44px;color:var(--text)}
     .card-meta{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
     .badge{font-size:11px;padding:2px 6px;border-radius:4px;font-weight:500}
-    .badge-proj{background:var(--badge-proj-bg);color:var(--text3)}
-    .badge-dl{background:var(--badge-dl-bg);color:#60a5fa}
+    .badge-proj{background:var(--badge-proj-bg);color:var(--badge-proj-color)}
+    .badge-dl{background:var(--badge-dl-bg);color:var(--badge-dl-color)}
     .badge-dl.overdue{background:#3b1f1f;color:#f87171}
-    .badge-del{background:var(--badge-del-bg);color:#c084fc}
-    .badge-tag{background:var(--badge-tag-bg);color:#4ade80;cursor:pointer}
-    [data-theme="light"] .badge-tag{color:#16a34a}
-    [data-theme="light"] .badge-dl{color:#2563eb}
-    [data-theme="light"] .badge-del{color:#7c3aed}
-    [data-theme="light"] .badge-proj{color:var(--text3)}
+    [data-theme="light"] .badge-dl.overdue{background:#fee2e2;color:#dc2626}
+    .badge-del{background:var(--badge-del-bg);color:var(--badge-del-color)}
+    .badge-tag{background:var(--badge-tag-bg);color:var(--badge-tag-color);cursor:pointer}
     .badge-tag:hover{opacity:.8}
     .badge-col{background:var(--bg3);color:var(--text3);border:1px solid var(--border2)}
     .pdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
