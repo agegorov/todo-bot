@@ -7,32 +7,32 @@ FROM tasks t
 JOIN projects p ON p.id = t.project_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
 LEFT JOIN tags tg ON tg.id = tt.tag_id
-WHERE t.done_at IS NULL
+WHERE t.done_at IS NULL AND t.user_id = $1
 GROUP BY t.id, p.name, p.color
 ORDER BY t.priority, t.deadline NULLS LAST, t.created_at;
 
 -- name: MoveTaskToColumn :exec
-UPDATE tasks SET column_id = $2 WHERE id = $1;
+UPDATE tasks SET column_id = $2 WHERE id = $1 AND user_id = $3;
 
 -- name: ListColumns :many
-SELECT * FROM board_columns ORDER BY position, id;
+SELECT * FROM board_columns WHERE user_id = $1 ORDER BY position, id;
 
 -- name: CreateColumn :one
-INSERT INTO board_columns (name, color, position)
-VALUES ($1, $2, (SELECT COALESCE(MAX(position),0)+1 FROM board_columns))
+INSERT INTO board_columns (name, color, position, user_id)
+VALUES ($1, $2, (SELECT COALESCE(MAX(position),0)+1 FROM board_columns WHERE user_id = $3), $3)
 RETURNING *;
 
 -- name: UpdateColumn :exec
-UPDATE board_columns SET name = $2, color = $3 WHERE id = $1;
+UPDATE board_columns SET name = $2, color = $3 WHERE id = $1 AND user_id = $4;
 
 -- name: DeleteColumn :exec
-DELETE FROM board_columns WHERE id = $1;
+DELETE FROM board_columns WHERE id = $1 AND user_id = $2;
 
 -- name: ReorderColumns :exec
-UPDATE board_columns SET position = $2 WHERE id = $1;
+UPDATE board_columns SET position = $2 WHERE id = $1 AND user_id = $3;
 
 -- name: UpdateTask :exec
-UPDATE tasks SET title = $2, notes = $3, priority = $4, deadline = $5 WHERE id = $1;
+UPDATE tasks SET title = $2, notes = $3, priority = $4, deadline = $5 WHERE id = $1 AND user_id = $6;
 
 -- name: DeleteTaskTags :exec
 DELETE FROM task_tags WHERE task_id = $1;

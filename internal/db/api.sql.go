@@ -12,18 +12,19 @@ import (
 )
 
 const createColumn = `-- name: CreateColumn :one
-INSERT INTO board_columns (name, color, position)
-VALUES ($1, $2, (SELECT COALESCE(MAX(position),0)+1 FROM board_columns))
-RETURNING id, name, color, position, created_at
+INSERT INTO board_columns (name, color, position, user_id)
+VALUES ($1, $2, (SELECT COALESCE(MAX(position),0)+1 FROM board_columns WHERE user_id = $3), $3)
+RETURNING id, name, color, position, created_at, user_id
 `
 
 type CreateColumnParams struct {
-	Name  string `json:"name"`
-	Color string `json:"color"`
+	Name   string `json:"name"`
+	Color  string `json:"color"`
+	UserID *int64 `json:"user_id"`
 }
 
 func (q *Queries) CreateColumn(ctx context.Context, arg CreateColumnParams) (BoardColumn, error) {
-	row := q.db.QueryRow(ctx, createColumn, arg.Name, arg.Color)
+	row := q.db.QueryRow(ctx, createColumn, arg.Name, arg.Color, arg.UserID)
 	var i BoardColumn
 	err := row.Scan(
 		&i.ID,
@@ -31,16 +32,22 @@ func (q *Queries) CreateColumn(ctx context.Context, arg CreateColumnParams) (Boa
 		&i.Color,
 		&i.Position,
 		&i.CreatedAt,
+		&i.UserID,
 	)
 	return i, err
 }
 
 const deleteColumn = `-- name: DeleteColumn :exec
-DELETE FROM board_columns WHERE id = $1
+DELETE FROM board_columns WHERE id = $1 AND user_id = $2
 `
 
-func (q *Queries) DeleteColumn(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deleteColumn, id)
+type DeleteColumnParams struct {
+	ID     int64  `json:"id"`
+	UserID *int64 `json:"user_id"`
+}
+
+func (q *Queries) DeleteColumn(ctx context.Context, arg DeleteColumnParams) error {
+	_, err := q.db.Exec(ctx, deleteColumn, arg.ID, arg.UserID)
 	return err
 }
 
@@ -54,11 +61,11 @@ func (q *Queries) DeleteTaskTags(ctx context.Context, taskID int64) error {
 }
 
 const listColumns = `-- name: ListColumns :many
-SELECT id, name, color, position, created_at FROM board_columns ORDER BY position, id
+SELECT id, name, color, position, created_at, user_id FROM board_columns WHERE user_id = $1 ORDER BY position, id
 `
 
-func (q *Queries) ListColumns(ctx context.Context) ([]BoardColumn, error) {
-	rows, err := q.db.Query(ctx, listColumns)
+func (q *Queries) ListColumns(ctx context.Context, userID *int64) ([]BoardColumn, error) {
+	rows, err := q.db.Query(ctx, listColumns, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +79,7 @@ func (q *Queries) ListColumns(ctx context.Context) ([]BoardColumn, error) {
 			&i.Color,
 			&i.Position,
 			&i.CreatedAt,
+			&i.UserID,
 		); err != nil {
 			return nil, err
 		}
@@ -92,7 +100,7 @@ FROM tasks t
 JOIN projects p ON p.id = t.project_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
 LEFT JOIN tags tg ON tg.id = tt.tag_id
-WHERE t.done_at IS NULL
+WHERE t.done_at IS NULL AND t.user_id = $1
 GROUP BY t.id, p.name, p.color
 ORDER BY t.priority, t.deadline NULLS LAST, t.created_at
 `
@@ -112,8 +120,8 @@ type ListTasksForBoardRow struct {
 	Tags         interface{}        `json:"tags"`
 }
 
-func (q *Queries) ListTasksForBoard(ctx context.Context) ([]ListTasksForBoardRow, error) {
-	rows, err := q.db.Query(ctx, listTasksForBoard)
+func (q *Queries) ListTasksForBoard(ctx context.Context, userID *int64) ([]ListTasksForBoardRow, error) {
+	rows, err := q.db.Query(ctx, listTasksForBoard, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,50 +154,58 @@ func (q *Queries) ListTasksForBoard(ctx context.Context) ([]ListTasksForBoardRow
 }
 
 const moveTaskToColumn = `-- name: MoveTaskToColumn :exec
-UPDATE tasks SET column_id = $2 WHERE id = $1
+UPDATE tasks SET column_id = $2 WHERE id = $1 AND user_id = $3
 `
 
 type MoveTaskToColumnParams struct {
-	ID       int64 `json:"id"`
-	ColumnID int64 `json:"column_id"`
+	ID       int64  `json:"id"`
+	ColumnID int64  `json:"column_id"`
+	UserID   *int64 `json:"user_id"`
 }
 
 func (q *Queries) MoveTaskToColumn(ctx context.Context, arg MoveTaskToColumnParams) error {
-	_, err := q.db.Exec(ctx, moveTaskToColumn, arg.ID, arg.ColumnID)
+	_, err := q.db.Exec(ctx, moveTaskToColumn, arg.ID, arg.ColumnID, arg.UserID)
 	return err
 }
 
 const reorderColumns = `-- name: ReorderColumns :exec
-UPDATE board_columns SET position = $2 WHERE id = $1
+UPDATE board_columns SET position = $2 WHERE id = $1 AND user_id = $3
 `
 
 type ReorderColumnsParams struct {
-	ID       int64 `json:"id"`
-	Position int32 `json:"position"`
+	ID       int64  `json:"id"`
+	Position int32  `json:"position"`
+	UserID   *int64 `json:"user_id"`
 }
 
 func (q *Queries) ReorderColumns(ctx context.Context, arg ReorderColumnsParams) error {
-	_, err := q.db.Exec(ctx, reorderColumns, arg.ID, arg.Position)
+	_, err := q.db.Exec(ctx, reorderColumns, arg.ID, arg.Position, arg.UserID)
 	return err
 }
 
 const updateColumn = `-- name: UpdateColumn :exec
-UPDATE board_columns SET name = $2, color = $3 WHERE id = $1
+UPDATE board_columns SET name = $2, color = $3 WHERE id = $1 AND user_id = $4
 `
 
 type UpdateColumnParams struct {
-	ID    int64  `json:"id"`
-	Name  string `json:"name"`
-	Color string `json:"color"`
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	Color  string `json:"color"`
+	UserID *int64 `json:"user_id"`
 }
 
 func (q *Queries) UpdateColumn(ctx context.Context, arg UpdateColumnParams) error {
-	_, err := q.db.Exec(ctx, updateColumn, arg.ID, arg.Name, arg.Color)
+	_, err := q.db.Exec(ctx, updateColumn,
+		arg.ID,
+		arg.Name,
+		arg.Color,
+		arg.UserID,
+	)
 	return err
 }
 
 const updateTask = `-- name: UpdateTask :exec
-UPDATE tasks SET title = $2, notes = $3, priority = $4, deadline = $5 WHERE id = $1
+UPDATE tasks SET title = $2, notes = $3, priority = $4, deadline = $5 WHERE id = $1 AND user_id = $6
 `
 
 type UpdateTaskParams struct {
@@ -198,6 +214,7 @@ type UpdateTaskParams struct {
 	Notes    *string            `json:"notes"`
 	Priority int16              `json:"priority"`
 	Deadline pgtype.Timestamptz `json:"deadline"`
+	UserID   *int64             `json:"user_id"`
 }
 
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
@@ -207,6 +224,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 		arg.Notes,
 		arg.Priority,
 		arg.Deadline,
+		arg.UserID,
 	)
 	return err
 }

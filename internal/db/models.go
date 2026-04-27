@@ -14,6 +14,7 @@ type BoardColumn struct {
 	Color     string             `json:"color"`
 	Position  int32              `json:"position"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UserID    *int64             `json:"user_id"`
 }
 
 type Project struct {
@@ -28,6 +29,13 @@ type Reminder struct {
 	TaskID   int64              `json:"task_id"`
 	RemindAt pgtype.Timestamptz `json:"remind_at"`
 	Sent     bool               `json:"sent"`
+}
+
+type Session struct {
+	Token     string             `json:"token"`
+	UserID    int64              `json:"user_id"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Tag struct {
@@ -48,9 +56,19 @@ type Task struct {
 	RecurRule   *string            `json:"recur_rule"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	ColumnID    int64              `json:"column_id"`
+	UserID      *int64             `json:"user_id"`
 }
 
 type TaskTag struct {
 	TaskID int64 `json:"task_id"`
 	TagID  int64 `json:"tag_id"`
+}
+
+type User struct {
+	ID        int64              `json:"id"`
+	GoogleID  string             `json:"google_id"`
+	Email     string             `json:"email"`
+	Name      string             `json:"name"`
+	Avatar    *string            `json:"avatar"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
