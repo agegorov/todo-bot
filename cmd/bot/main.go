@@ -13,6 +13,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/aegorov/todo-bot/internal/api"
+	"github.com/aegorov/todo-bot/internal/auth"
 	"github.com/aegorov/todo-bot/internal/bot"
 	"github.com/aegorov/todo-bot/internal/db"
 	"github.com/aegorov/todo-bot/internal/scheduler"
@@ -22,7 +23,7 @@ import (
 func main() {
 	_ = godotenv.Load()
 
-	required := []string{"TELEGRAM_TOKEN", "TELEGRAM_OWNER_ID", "DATABASE_URL", "WHISPER_ENDPOINT"}
+	required := []string{"TELEGRAM_TOKEN", "TELEGRAM_OWNER_ID", "DATABASE_URL", "WHISPER_ENDPOINT", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "BASE_URL"}
 	for _, key := range required {
 		if os.Getenv(key) == "" {
 			log.Fatalf("missing env: %s", key)
@@ -55,6 +56,13 @@ func main() {
 	sched.Start()
 	defer sched.Stop()
 
+	authHandler := auth.New(
+		os.Getenv("GOOGLE_CLIENT_ID"),
+		os.Getenv("GOOGLE_CLIENT_SECRET"),
+		os.Getenv("BASE_URL"),
+		queries,
+	)
+
 	// HTTP сервер для веб-интерфейса
 	webPort := os.Getenv("WEB_PORT")
 	if webPort == "" {
@@ -62,7 +70,7 @@ func main() {
 	}
 	srv := &http.Server{
 		Addr:    ":" + webPort,
-		Handler: api.New(queries).Router(),
+		Handler: api.New(queries, authHandler).Router(),
 	}
 	go func() {
 		log.Printf("web: listening on :%s", webPort)
