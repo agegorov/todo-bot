@@ -21,21 +21,22 @@ func (q *Queries) CompleteTask(ctx context.Context, id int64) error {
 }
 
 const createTask = `-- name: CreateTask :one
-INSERT INTO tasks (project_id, title, notes, priority, deadline, delegated_to, is_recurring, recur_rule, user_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, project_id, title, notes, priority, deadline, done_at, delegated_to, is_recurring, recur_rule, created_at, column_id, user_id
+INSERT INTO tasks (project_id, title, notes, priority, deadline, delegated_to, is_recurring, recur_rule, user_id, telegram_user_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, project_id, title, notes, priority, deadline, done_at, delegated_to, is_recurring, recur_rule, created_at, column_id, user_id, telegram_user_id
 `
 
 type CreateTaskParams struct {
-	ProjectID   int64              `json:"project_id"`
-	Title       string             `json:"title"`
-	Notes       *string            `json:"notes"`
-	Priority    int16              `json:"priority"`
-	Deadline    pgtype.Timestamptz `json:"deadline"`
-	DelegatedTo *string            `json:"delegated_to"`
-	IsRecurring bool               `json:"is_recurring"`
-	RecurRule   *string            `json:"recur_rule"`
-	UserID      *int64             `json:"user_id"`
+	ProjectID      int64              `json:"project_id"`
+	Title          string             `json:"title"`
+	Notes          *string            `json:"notes"`
+	Priority       int16              `json:"priority"`
+	Deadline       pgtype.Timestamptz `json:"deadline"`
+	DelegatedTo    *string            `json:"delegated_to"`
+	IsRecurring    bool               `json:"is_recurring"`
+	RecurRule      *string            `json:"recur_rule"`
+	UserID         *int64             `json:"user_id"`
+	TelegramUserID *int64             `json:"telegram_user_id"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error) {
@@ -49,6 +50,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		arg.IsRecurring,
 		arg.RecurRule,
 		arg.UserID,
+		arg.TelegramUserID,
 	)
 	var i Task
 	err := row.Scan(
@@ -65,6 +67,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		&i.CreatedAt,
 		&i.ColumnID,
 		&i.UserID,
+		&i.TelegramUserID,
 	)
 	return i, err
 }
@@ -84,27 +87,28 @@ func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) error {
 }
 
 const getTask = `-- name: GetTask :one
-SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, p.name AS project_name
+SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, t.telegram_user_id, p.name AS project_name
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
 WHERE t.id = $1
 `
 
 type GetTaskRow struct {
-	ID          int64              `json:"id"`
-	ProjectID   int64              `json:"project_id"`
-	Title       string             `json:"title"`
-	Notes       *string            `json:"notes"`
-	Priority    int16              `json:"priority"`
-	Deadline    pgtype.Timestamptz `json:"deadline"`
-	DoneAt      pgtype.Timestamptz `json:"done_at"`
-	DelegatedTo *string            `json:"delegated_to"`
-	IsRecurring bool               `json:"is_recurring"`
-	RecurRule   *string            `json:"recur_rule"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	ColumnID    int64              `json:"column_id"`
-	UserID      *int64             `json:"user_id"`
-	ProjectName string             `json:"project_name"`
+	ID             int64              `json:"id"`
+	ProjectID      int64              `json:"project_id"`
+	Title          string             `json:"title"`
+	Notes          *string            `json:"notes"`
+	Priority       int16              `json:"priority"`
+	Deadline       pgtype.Timestamptz `json:"deadline"`
+	DoneAt         pgtype.Timestamptz `json:"done_at"`
+	DelegatedTo    *string            `json:"delegated_to"`
+	IsRecurring    bool               `json:"is_recurring"`
+	RecurRule      *string            `json:"recur_rule"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	ColumnID       int64              `json:"column_id"`
+	UserID         *int64             `json:"user_id"`
+	TelegramUserID *int64             `json:"telegram_user_id"`
+	ProjectName    string             `json:"project_name"`
 }
 
 func (q *Queries) GetTask(ctx context.Context, id int64) (GetTaskRow, error) {
@@ -124,13 +128,14 @@ func (q *Queries) GetTask(ctx context.Context, id int64) (GetTaskRow, error) {
 		&i.CreatedAt,
 		&i.ColumnID,
 		&i.UserID,
+		&i.TelegramUserID,
 		&i.ProjectName,
 	)
 	return i, err
 }
 
 const listOpenTasks = `-- name: ListOpenTasks :many
-SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, p.name AS project_name
+SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, t.telegram_user_id, p.name AS project_name
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
 WHERE t.done_at IS NULL
@@ -138,20 +143,21 @@ ORDER BY t.priority, t.deadline NULLS LAST, t.created_at
 `
 
 type ListOpenTasksRow struct {
-	ID          int64              `json:"id"`
-	ProjectID   int64              `json:"project_id"`
-	Title       string             `json:"title"`
-	Notes       *string            `json:"notes"`
-	Priority    int16              `json:"priority"`
-	Deadline    pgtype.Timestamptz `json:"deadline"`
-	DoneAt      pgtype.Timestamptz `json:"done_at"`
-	DelegatedTo *string            `json:"delegated_to"`
-	IsRecurring bool               `json:"is_recurring"`
-	RecurRule   *string            `json:"recur_rule"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	ColumnID    int64              `json:"column_id"`
-	UserID      *int64             `json:"user_id"`
-	ProjectName string             `json:"project_name"`
+	ID             int64              `json:"id"`
+	ProjectID      int64              `json:"project_id"`
+	Title          string             `json:"title"`
+	Notes          *string            `json:"notes"`
+	Priority       int16              `json:"priority"`
+	Deadline       pgtype.Timestamptz `json:"deadline"`
+	DoneAt         pgtype.Timestamptz `json:"done_at"`
+	DelegatedTo    *string            `json:"delegated_to"`
+	IsRecurring    bool               `json:"is_recurring"`
+	RecurRule      *string            `json:"recur_rule"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	ColumnID       int64              `json:"column_id"`
+	UserID         *int64             `json:"user_id"`
+	TelegramUserID *int64             `json:"telegram_user_id"`
+	ProjectName    string             `json:"project_name"`
 }
 
 func (q *Queries) ListOpenTasks(ctx context.Context) ([]ListOpenTasksRow, error) {
@@ -177,6 +183,7 @@ func (q *Queries) ListOpenTasks(ctx context.Context) ([]ListOpenTasksRow, error)
 			&i.CreatedAt,
 			&i.ColumnID,
 			&i.UserID,
+			&i.TelegramUserID,
 			&i.ProjectName,
 		); err != nil {
 			return nil, err
@@ -190,7 +197,7 @@ func (q *Queries) ListOpenTasks(ctx context.Context) ([]ListOpenTasksRow, error)
 }
 
 const listOverdueTasks = `-- name: ListOverdueTasks :many
-SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, p.name AS project_name
+SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, t.telegram_user_id, p.name AS project_name
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
 WHERE t.done_at IS NULL
@@ -199,20 +206,21 @@ ORDER BY t.deadline
 `
 
 type ListOverdueTasksRow struct {
-	ID          int64              `json:"id"`
-	ProjectID   int64              `json:"project_id"`
-	Title       string             `json:"title"`
-	Notes       *string            `json:"notes"`
-	Priority    int16              `json:"priority"`
-	Deadline    pgtype.Timestamptz `json:"deadline"`
-	DoneAt      pgtype.Timestamptz `json:"done_at"`
-	DelegatedTo *string            `json:"delegated_to"`
-	IsRecurring bool               `json:"is_recurring"`
-	RecurRule   *string            `json:"recur_rule"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	ColumnID    int64              `json:"column_id"`
-	UserID      *int64             `json:"user_id"`
-	ProjectName string             `json:"project_name"`
+	ID             int64              `json:"id"`
+	ProjectID      int64              `json:"project_id"`
+	Title          string             `json:"title"`
+	Notes          *string            `json:"notes"`
+	Priority       int16              `json:"priority"`
+	Deadline       pgtype.Timestamptz `json:"deadline"`
+	DoneAt         pgtype.Timestamptz `json:"done_at"`
+	DelegatedTo    *string            `json:"delegated_to"`
+	IsRecurring    bool               `json:"is_recurring"`
+	RecurRule      *string            `json:"recur_rule"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	ColumnID       int64              `json:"column_id"`
+	UserID         *int64             `json:"user_id"`
+	TelegramUserID *int64             `json:"telegram_user_id"`
+	ProjectName    string             `json:"project_name"`
 }
 
 func (q *Queries) ListOverdueTasks(ctx context.Context) ([]ListOverdueTasksRow, error) {
@@ -238,6 +246,7 @@ func (q *Queries) ListOverdueTasks(ctx context.Context) ([]ListOverdueTasksRow, 
 			&i.CreatedAt,
 			&i.ColumnID,
 			&i.UserID,
+			&i.TelegramUserID,
 			&i.ProjectName,
 		); err != nil {
 			return nil, err
@@ -280,7 +289,7 @@ func (q *Queries) ListProjects(ctx context.Context) ([]Project, error) {
 }
 
 const listTodayTasks = `-- name: ListTodayTasks :many
-SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, p.name AS project_name
+SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, t.telegram_user_id, p.name AS project_name
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
 WHERE t.done_at IS NULL
@@ -289,20 +298,21 @@ ORDER BY t.deadline NULLS LAST
 `
 
 type ListTodayTasksRow struct {
-	ID          int64              `json:"id"`
-	ProjectID   int64              `json:"project_id"`
-	Title       string             `json:"title"`
-	Notes       *string            `json:"notes"`
-	Priority    int16              `json:"priority"`
-	Deadline    pgtype.Timestamptz `json:"deadline"`
-	DoneAt      pgtype.Timestamptz `json:"done_at"`
-	DelegatedTo *string            `json:"delegated_to"`
-	IsRecurring bool               `json:"is_recurring"`
-	RecurRule   *string            `json:"recur_rule"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	ColumnID    int64              `json:"column_id"`
-	UserID      *int64             `json:"user_id"`
-	ProjectName string             `json:"project_name"`
+	ID             int64              `json:"id"`
+	ProjectID      int64              `json:"project_id"`
+	Title          string             `json:"title"`
+	Notes          *string            `json:"notes"`
+	Priority       int16              `json:"priority"`
+	Deadline       pgtype.Timestamptz `json:"deadline"`
+	DoneAt         pgtype.Timestamptz `json:"done_at"`
+	DelegatedTo    *string            `json:"delegated_to"`
+	IsRecurring    bool               `json:"is_recurring"`
+	RecurRule      *string            `json:"recur_rule"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	ColumnID       int64              `json:"column_id"`
+	UserID         *int64             `json:"user_id"`
+	TelegramUserID *int64             `json:"telegram_user_id"`
+	ProjectName    string             `json:"project_name"`
 }
 
 func (q *Queries) ListTodayTasks(ctx context.Context) ([]ListTodayTasksRow, error) {
@@ -328,6 +338,7 @@ func (q *Queries) ListTodayTasks(ctx context.Context) ([]ListTodayTasksRow, erro
 			&i.CreatedAt,
 			&i.ColumnID,
 			&i.UserID,
+			&i.TelegramUserID,
 			&i.ProjectName,
 		); err != nil {
 			return nil, err

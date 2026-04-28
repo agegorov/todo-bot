@@ -57,6 +57,14 @@
     .user-name{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .logout-btn{background:none;border:1px solid var(--border2);border-radius:8px;padding:5px 10px;color:var(--text3);font-size:12px;cursor:pointer;transition:all .15s}
     .logout-btn:hover{border-color:#f87171;color:#f87171}
+    .link-tg-btn{background:none;border:1px solid var(--border2);border-radius:8px;padding:5px 10px;color:var(--text3);font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .link-tg-btn:hover{border-color:#60a5fa;color:#60a5fa}
+    .link-tg-modal .modal{width:380px;text-align:center}
+    .link-tg-modal .token-box{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:12px;font-size:22px;font-weight:700;letter-spacing:3px;color:var(--accent);margin:16px 0;font-family:monospace}
+    .link-tg-modal .cmd-box{background:var(--bg4);border-radius:8px;padding:8px 14px;font-size:13px;color:var(--text2);font-family:monospace;cursor:pointer;transition:background .15s;margin-bottom:6px}
+    .link-tg-modal .cmd-box:hover{background:var(--bg3)}
+    .link-tg-modal .hint{font-size:12px;color:var(--text4);line-height:1.5}
+    .tg-linked{font-size:12px;color:#4ade80;display:flex;align-items:center;gap:4px}
 
     /* ── Toolbar ── */
     .toolbar{display:flex;align-items:center;gap:10px;padding:10px 20px;background:var(--bg4);border-bottom:1px solid var(--border);flex-wrap:wrap}
@@ -182,6 +190,8 @@
     <div class="user-info" id="userInfo" style="display:none">
       <img class="user-avatar" id="userAvatar" src="" alt="">
       <span class="user-name" id="userName"></span>
+      <span class="tg-linked" id="tgLinked" style="display:none" title="Telegram привязан">✅ TG</span>
+      <button class="link-tg-btn" id="linkTgBtn" style="display:none">🔗 Привязать Telegram</button>
       <a href="/auth/logout" class="logout-btn">Выйти</a>
     </div>
     <button class="theme-btn" id="themeBtn" title="Сменить тему">🌙</button>
@@ -249,6 +259,19 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Link Telegram modal -->
+<div class="modal-bg link-tg-modal" id="linkTgModal">
+  <div class="modal">
+    <h2>🔗 Привязать Telegram</h2>
+    <p style="font-size:13px;color:var(--text3);margin-bottom:4px">Отправь эту команду боту:</p>
+    <div class="cmd-box" id="linkCmd" title="Нажми чтобы скопировать"></div>
+    <div class="hint">Токен действителен <b>15 минут</b>.<br>После отправки команды задачи из бота появятся на доске.</div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn secondary" id="linkTgClose">Закрыть</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const API = '/api';
@@ -705,8 +728,41 @@ async function loadMe() {
     else { avatar.style.display = 'none'; }
     name.textContent = me.name || me.email || '';
     info.style.display = 'flex';
+
+    if (me.telegram_linked) {
+      document.getElementById('tgLinked').style.display = 'flex';
+      document.getElementById('linkTgBtn').style.display = 'none';
+    } else {
+      document.getElementById('tgLinked').style.display = 'none';
+      document.getElementById('linkTgBtn').style.display = '';
+    }
   } catch(e) { /* silent */ }
 }
+
+document.getElementById('linkTgBtn').addEventListener('click', async () => {
+  const res = await fetch(`${API}/link/telegram`, {method: 'POST'});
+  if (!res.ok) { toast('❌ Ошибка генерации токена'); return; }
+  const data = await res.json();
+  const cmd = data.command;
+  document.getElementById('linkCmd').textContent = cmd;
+  document.getElementById('linkTgModal').classList.add('open');
+});
+
+document.getElementById('linkCmd').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('linkCmd').textContent);
+  toast('📋 Скопировано!');
+});
+
+document.getElementById('linkTgClose').addEventListener('click', () => {
+  document.getElementById('linkTgModal').classList.remove('open');
+  loadMe(); // обновить статус привязки
+});
+document.getElementById('linkTgModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) {
+    e.target.classList.remove('open');
+    loadMe();
+  }
+});
 
 loadMe();
 load();

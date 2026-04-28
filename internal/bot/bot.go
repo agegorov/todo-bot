@@ -72,7 +72,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 }
 
 func (b *Bot) handleText(ctx context.Context, msg *tgbotapi.Message) {
-	_, err := b.createTaskFromText(ctx, msg.Text, msg.Chat.ID)
+	_, err := b.createTaskFromText(ctx, msg.Text, msg.Chat.ID, msg.From.ID)
 	if err != nil {
 		b.send(msg.Chat.ID, "❌ Ошибка: "+err.Error())
 	}
@@ -95,10 +95,10 @@ func (b *Bot) handleVoice(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	b.send(msg.Chat.ID, "📝 Распознано: "+text)
-	b.createTaskFromText(ctx, text, msg.Chat.ID)
+	b.createTaskFromText(ctx, text, msg.Chat.ID, msg.From.ID)
 }
 
-func (b *Bot) createTaskFromText(ctx context.Context, text string, chatID int64) (*db.Task, error) {
+func (b *Bot) createTaskFromText(ctx context.Context, text string, chatID int64, telegramUserID int64) (*db.Task, error) {
 	parsed := parser.Parse(text, time.Now())
 
 	projectID, err := b.resolveProject(ctx, parsed.Project)
@@ -125,14 +125,15 @@ func (b *Bot) createTaskFromText(ctx context.Context, text string, chatID int64)
 	}
 
 	task, err := b.queries.CreateTask(ctx, db.CreateTaskParams{
-		ProjectID:   projectID,
-		Title:       parsed.Title,
-		Notes:       notes,
-		Priority:    int16(parsed.Priority),
-		Deadline:    deadline,
-		DelegatedTo: delegated,
-		IsRecurring: parsed.IsRecurring,
-		RecurRule:   recurRule,
+		ProjectID:      projectID,
+		Title:          parsed.Title,
+		Notes:          notes,
+		Priority:       int16(parsed.Priority),
+		Deadline:       deadline,
+		DelegatedTo:    delegated,
+		IsRecurring:    parsed.IsRecurring,
+		RecurRule:      recurRule,
+		TelegramUserID: &telegramUserID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("сохранение задачи: %w", err)
@@ -179,6 +180,12 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 		b.cmdDone(ctx, msg.Chat.ID, parts[1])
 	case "/projects":
 		b.cmdProjects(ctx, msg.Chat.ID)
+	case "/link":
+		if len(parts) < 2 {
+			b.send(msg.Chat.ID, "Использование: /link <токен>\nТокен можно получить на сайте в настройках.")
+			return
+		}
+		b.cmdLink(ctx, msg.Chat.ID, msg.From.ID, parts[1])
 	case "/start", "/help":
 		b.send(msg.Chat.ID, helpText())
 	default:
@@ -224,6 +231,37 @@ func (b *Bot) cmdDone(ctx context.Context, chatID int64, idStr string) {
 		return
 	}
 	b.send(chatID, fmt.Sprintf("✅ Задача #%d закрыта!", id))
+}
+
+func (b *Bot) cmdLink(ctx context.Context, chatID int64, telegramUserID int64, token string) {
+	row, err := b.queries.GetLinkToken(ctx, token)
+	if err != nil {
+		b.send(chatID, "❌ Токен недействителен или истёк. Получи новый на сайте.")
+		return
+	}
+
+	// Привязываем telegram_id к веб-аккаунту
+	if err := b.queries.SetUserTelegramID(ctx, db.SetUserTelegramIDParams{
+		ID:         row.UserID,
+		TelegramID: &telegramUserID,
+	}); err != nil {
+		b.send(chatID, "❌ Ошибка привязки: "+err.Error())
+		return
+	}
+
+	// Переносим все orphan задачи этого Telegram пользователя
+	_ = b.queries.ClaimTasksByTelegram(ctx, db.ClaimTasksByTelegramParams{
+		UserID:         &row.UserID,
+		TelegramUserID: &telegramUserID,
+	})
+
+	// Удаляем использованный токен
+	_ = b.queries.DeleteLinkToken(ctx, token)
+
+	b.send(chatID, fmt.Sprintf(
+		"✅ Аккаунт привязан!\n\nВеб: *%s*\nВсе твои задачи теперь доступны на доске.",
+		row.Email,
+	))
 }
 
 func (b *Bot) cmdProjects(ctx context.Context, chatID int64) {

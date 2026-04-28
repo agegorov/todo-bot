@@ -72,20 +72,21 @@ func (q *Queries) DeleteSession(ctx context.Context, token string) error {
 }
 
 const getSession = `-- name: GetSession :one
-SELECT s.token, s.user_id, s.expires_at, s.created_at, u.email, u.name, u.avatar
+SELECT s.token, s.user_id, s.expires_at, s.created_at, u.email, u.name, u.avatar, u.telegram_id IS NOT NULL AS telegram_linked
 FROM sessions s
 JOIN users u ON u.id = s.user_id
 WHERE s.token = $1 AND s.expires_at > NOW()
 `
 
 type GetSessionRow struct {
-	Token     string             `json:"token"`
-	UserID    int64              `json:"user_id"`
-	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	Email     string             `json:"email"`
-	Name      string             `json:"name"`
-	Avatar    *string            `json:"avatar"`
+	Token          string             `json:"token"`
+	UserID         int64              `json:"user_id"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	Email          string             `json:"email"`
+	Name           string             `json:"name"`
+	Avatar         *string            `json:"avatar"`
+	TelegramLinked interface{}        `json:"telegram_linked"`
 }
 
 func (q *Queries) GetSession(ctx context.Context, token string) (GetSessionRow, error) {
@@ -99,6 +100,7 @@ func (q *Queries) GetSession(ctx context.Context, token string) (GetSessionRow, 
 		&i.Email,
 		&i.Name,
 		&i.Avatar,
+		&i.TelegramLinked,
 	)
 	return i, err
 }
@@ -110,7 +112,7 @@ ON CONFLICT (google_id) DO UPDATE
     SET email  = EXCLUDED.email,
         name   = EXCLUDED.name,
         avatar = EXCLUDED.avatar
-RETURNING id, google_id, email, name, avatar, created_at
+RETURNING id, google_id, email, name, avatar, created_at, telegram_id
 `
 
 type UpsertUserParams struct {
@@ -135,6 +137,7 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		&i.Name,
 		&i.Avatar,
 		&i.CreatedAt,
+		&i.TelegramID,
 	)
 	return i, err
 }

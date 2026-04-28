@@ -17,6 +17,13 @@ type BoardColumn struct {
 	UserID    *int64             `json:"user_id"`
 }
 
+type LinkToken struct {
+	Token     string             `json:"token"`
+	UserID    int64              `json:"user_id"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type Project struct {
 	ID        int64              `json:"id"`
 	Name      string             `json:"name"`
@@ -44,19 +51,20 @@ type Tag struct {
 }
 
 type Task struct {
-	ID          int64              `json:"id"`
-	ProjectID   int64              `json:"project_id"`
-	Title       string             `json:"title"`
-	Notes       *string            `json:"notes"`
-	Priority    int16              `json:"priority"`
-	Deadline    pgtype.Timestamptz `json:"deadline"`
-	DoneAt      pgtype.Timestamptz `json:"done_at"`
-	DelegatedTo *string            `json:"delegated_to"`
-	IsRecurring bool               `json:"is_recurring"`
-	RecurRule   *string            `json:"recur_rule"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	ColumnID    int64              `json:"column_id"`
-	UserID      *int64             `json:"user_id"`
+	ID             int64              `json:"id"`
+	ProjectID      int64              `json:"project_id"`
+	Title          string             `json:"title"`
+	Notes          *string            `json:"notes"`
+	Priority       int16              `json:"priority"`
+	Deadline       pgtype.Timestamptz `json:"deadline"`
+	DoneAt         pgtype.Timestamptz `json:"done_at"`
+	DelegatedTo    *string            `json:"delegated_to"`
+	IsRecurring    bool               `json:"is_recurring"`
+	RecurRule      *string            `json:"recur_rule"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	ColumnID       int64              `json:"column_id"`
+	UserID         *int64             `json:"user_id"`
+	TelegramUserID *int64             `json:"telegram_user_id"`
 }
 
 type TaskTag struct {
@@ -65,10 +73,11 @@ type TaskTag struct {
 }
 
 type User struct {
-	ID        int64              `json:"id"`
-	GoogleID  string             `json:"google_id"`
-	Email     string             `json:"email"`
-	Name      string             `json:"name"`
-	Avatar    *string            `json:"avatar"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID         int64              `json:"id"`
+	GoogleID   string             `json:"google_id"`
+	Email      string             `json:"email"`
+	Name       string             `json:"name"`
+	Avatar     *string            `json:"avatar"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	TelegramID *int64             `json:"telegram_id"`
 }

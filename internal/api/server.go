@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -65,6 +66,8 @@ func (s *Server) Router() http.Handler {
 		r.Patch("/columns/{id}/position", s.reorderColumn)
 
 		r.Get("/projects", s.listProjects)
+
+		r.Post("/link/telegram", s.generateLinkToken)
 	})
 
 	// Статика (с проверкой авторизации через middleware)
@@ -82,10 +85,11 @@ func (s *Server) getMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, map[string]any{
-		"id":     u.ID,
-		"email":  u.Email,
-		"name":   u.Name,
-		"avatar": u.Avatar,
+		"id":              u.ID,
+		"email":           u.Email,
+		"name":            u.Name,
+		"avatar":          u.Avatar,
+		"telegram_linked": u.TelegramLinked,
 	})
 }
 
@@ -392,6 +396,32 @@ func (s *Server) reorderColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Telegram link ─────────────────────────────────────────────────────────────
+
+func (s *Server) generateLinkToken(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFromContext(r.Context())
+	token := randomToken(8)
+	_, err := s.queries.CreateLinkToken(r.Context(), db.CreateLinkTokenParams{
+		Token:  token,
+		UserID: u.ID,
+	})
+	if err != nil {
+		jsonError(w, err, 500)
+		return
+	}
+	jsonOK(w, map[string]string{"token": token, "command": "/link " + token})
+}
+
+const tokenChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+func randomToken(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = tokenChars[rand.Intn(len(tokenChars))]
+	}
+	return string(b)
 }
 
 // ── Projects ──────────────────────────────────────────────────────────────────

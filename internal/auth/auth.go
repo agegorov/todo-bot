@@ -39,10 +39,11 @@ type contextKey string
 const UserKey contextKey = "user"
 
 type SessionUser struct {
-	ID     int64
-	Email  string
-	Name   string
-	Avatar string
+	ID             int64
+	Email          string
+	Name           string
+	Avatar         string
+	TelegramLinked bool
 }
 
 func New(clientID, clientSecret, baseURL string, q *db.Queries) *Handler {
@@ -157,11 +158,13 @@ func (h *Handler) Middleware(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 			return
 		}
+		linked, _ := sess.TelegramLinked.(bool)
 		user := &SessionUser{
-			ID:     sess.UserID,
-			Email:  sess.Email,
-			Name:   sess.Name,
-			Avatar: derefStr(sess.Avatar),
+			ID:             sess.UserID,
+			Email:          sess.Email,
+			Name:           sess.Name,
+			Avatar:         derefStr(sess.Avatar),
+			TelegramLinked: linked,
 		}
 		ctx := context.WithValue(r.Context(), UserKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -181,11 +184,13 @@ func (h *Handler) APIMiddleware(next http.Handler) http.Handler {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
+		linked, _ := sess.TelegramLinked.(bool)
 		user := &SessionUser{
-			ID:     sess.UserID,
-			Email:  sess.Email,
-			Name:   sess.Name,
-			Avatar: derefStr(sess.Avatar),
+			ID:             sess.UserID,
+			Email:          sess.Email,
+			Name:           sess.Name,
+			Avatar:         derefStr(sess.Avatar),
+			TelegramLinked: linked,
 		}
 		ctx := context.WithValue(r.Context(), UserKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))

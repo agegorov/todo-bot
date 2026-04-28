@@ -13,7 +13,7 @@ VALUES ($1, $2, $3)
 RETURNING *;
 
 -- name: GetSession :one
-SELECT s.*, u.email, u.name, u.avatar
+SELECT s.*, u.email, u.name, u.avatar, u.telegram_id IS NOT NULL AS telegram_linked
 FROM sessions s
 JOIN users u ON u.id = s.user_id
 WHERE s.token = $1 AND s.expires_at > NOW();
