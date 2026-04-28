@@ -1,6 +1,6 @@
 -- name: CreateTask :one
-INSERT INTO tasks (project_id, title, notes, priority, deadline, delegated_to, is_recurring, recur_rule)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO tasks (project_id, title, notes, priority, deadline, delegated_to, is_recurring, recur_rule, user_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: GetTask :one
@@ -36,7 +36,7 @@ ORDER BY t.deadline;
 UPDATE tasks SET done_at = NOW() WHERE id = $1;
 
 -- name: DeleteTask :exec
-DELETE FROM tasks WHERE id = $1;
+DELETE FROM tasks WHERE id = $1 AND (user_id = $2 OR user_id IS NULL);
 
 -- name: ListProjects :many
 SELECT * FROM projects ORDER BY id;

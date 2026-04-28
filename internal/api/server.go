@@ -186,6 +186,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		DelegatedTo: delegated,
 		IsRecurring: parsed.IsRecurring,
 		RecurRule:   recurRule,
+		UserID:      &u.ID,
 	})
 	if err != nil {
 		jsonError(w, err, 500)
@@ -205,9 +206,6 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 			UserID: &u.ID,
 		})
 	}
-
-	// Назначаем user_id задаче
-	_ = s.queries.ClaimOrphanTasks(r.Context(), &u.ID)
 
 	for _, tagName := range parsed.Tags {
 		tag, err := s.queries.UpsertTag(r.Context(), tagName)
@@ -293,8 +291,12 @@ func (s *Server) moveTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteTask(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFromContext(r.Context())
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err := s.queries.DeleteTask(r.Context(), id); err != nil {
+	if err := s.queries.DeleteTask(r.Context(), db.DeleteTaskParams{
+		ID:     id,
+		UserID: &u.ID,
+	}); err != nil {
 		jsonError(w, err, 500)
 		return
 	}

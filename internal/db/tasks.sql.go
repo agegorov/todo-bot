@@ -21,8 +21,8 @@ func (q *Queries) CompleteTask(ctx context.Context, id int64) error {
 }
 
 const createTask = `-- name: CreateTask :one
-INSERT INTO tasks (project_id, title, notes, priority, deadline, delegated_to, is_recurring, recur_rule)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO tasks (project_id, title, notes, priority, deadline, delegated_to, is_recurring, recur_rule, user_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING id, project_id, title, notes, priority, deadline, done_at, delegated_to, is_recurring, recur_rule, created_at, column_id, user_id
 `
 
@@ -35,6 +35,7 @@ type CreateTaskParams struct {
 	DelegatedTo *string            `json:"delegated_to"`
 	IsRecurring bool               `json:"is_recurring"`
 	RecurRule   *string            `json:"recur_rule"`
+	UserID      *int64             `json:"user_id"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error) {
@@ -47,6 +48,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		arg.DelegatedTo,
 		arg.IsRecurring,
 		arg.RecurRule,
+		arg.UserID,
 	)
 	var i Task
 	err := row.Scan(
@@ -68,11 +70,16 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 }
 
 const deleteTask = `-- name: DeleteTask :exec
-DELETE FROM tasks WHERE id = $1
+DELETE FROM tasks WHERE id = $1 AND (user_id = $2 OR user_id IS NULL)
 `
 
-func (q *Queries) DeleteTask(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deleteTask, id)
+type DeleteTaskParams struct {
+	ID     int64  `json:"id"`
+	UserID *int64 `json:"user_id"`
+}
+
+func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) error {
+	_, err := q.db.Exec(ctx, deleteTask, arg.ID, arg.UserID)
 	return err
 }
 
