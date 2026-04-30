@@ -632,6 +632,12 @@ function toast(msg){
 }
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// Закрытие любого открытого модального окна по Esc
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.modal-bg.open').forEach(m => m.classList.remove('open'));
+});
+
 // ── Edit task modal ───────────────────────────────────────────────────────────
 
 let editTaskId = null;
