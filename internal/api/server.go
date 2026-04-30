@@ -57,6 +57,7 @@ func (s *Server) Router() http.Handler {
 		r.Post("/tasks", s.createTask)
 		r.Put("/tasks/{id}", s.updateTask)
 		r.Patch("/tasks/{id}/column", s.moveTask)
+		r.Post("/tasks/{id}/complete", s.completeTask)
 		r.Delete("/tasks/{id}", s.deleteTask)
 
 		r.Get("/columns", s.listColumns)
@@ -113,6 +114,7 @@ func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
 		ProjectColor string   `json:"project_color"`
 		DelegatedTo  *string  `json:"delegated_to"`
 		Tags         []string `json:"tags"`
+		DoneAt       *string  `json:"done_at"`
 	}
 	resp := make([]taskResp, len(tasks))
 	for i, t := range tasks {
@@ -135,11 +137,17 @@ func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
 		if tags == nil {
 			tags = []string{}
 		}
+		var doneAt *string
+		if t.DoneAt.Valid {
+			s := t.DoneAt.Time.Format("02 Jan 15:04")
+			doneAt = &s
+		}
 		resp[i] = taskResp{
 			ID: t.ID, Title: t.Title, Notes: t.Notes,
 			Priority: t.Priority, Deadline: dl, ColumnID: t.ColumnID,
 			ProjectName: t.ProjectName, ProjectColor: t.ProjectColor,
 			DelegatedTo: t.DelegatedTo, Tags: tags,
+			DoneAt: doneAt,
 		}
 	}
 	jsonOK(w, resp)
@@ -196,14 +204,16 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Новые задачи всегда попадают в системную колонку (TO DO)
-	sysCol, sysErr := s.queries.EnsureSystemColumn(r.Context(), &u.ID)
+	// Новые задачи всегда попадают в системную колонку TO DO
+	todoCol, sysErr := s.queries.EnsureTodoColumn(r.Context(), &u.ID)
 	if sysErr == nil {
 		_ = s.queries.MoveTaskToColumn(r.Context(), db.MoveTaskToColumnParams{
-			ID: task.ID, ColumnID: sysCol.ID,
+			ID: task.ID, ColumnID: todoCol.ID,
 			UserID: &u.ID,
 		})
 	}
+	// Гарантируем что Done колонка тоже существует
+	_, _ = s.queries.EnsureDoneColumn(r.Context(), &u.ID)
 
 	for _, tagName := range parsed.Tags {
 		tag, err := s.queries.UpsertTag(r.Context(), tagName)
@@ -280,6 +290,21 @@ func (s *Server) moveTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.queries.MoveTaskToColumn(r.Context(), db.MoveTaskToColumnParams{
 		ID: id, ColumnID: body.ColumnID,
+		UserID: &u.ID,
+	}); err != nil {
+		jsonError(w, err, 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFromContext(r.Context())
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	// Гарантируем что Done колонка существует
+	_, _ = s.queries.EnsureDoneColumn(r.Context(), &u.ID)
+	if err := s.queries.CompleteTaskForUser(r.Context(), db.CompleteTaskForUserParams{
+		ID:     id,
 		UserID: &u.ID,
 	}); err != nil {
 		jsonError(w, err, 500)

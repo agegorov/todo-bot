@@ -131,8 +131,12 @@
     .pdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
     .p1{background:#f87171}.p2{background:#fbbf24}.p3{background:#4ade80}
     .card-del{position:absolute;top:7px;right:7px;background:none;border:none;font-size:13px;cursor:pointer;display:none;color:var(--border2);transition:color .15s}
-    .card:hover .card-del{display:block}
+    .card-done{position:absolute;top:7px;right:26px;background:none;border:none;font-size:13px;cursor:pointer;display:none;color:var(--border2);transition:color .15s}
+    .card:hover .card-del,.card:hover .card-done{display:block}
     .card-del:hover{color:#f87171}
+    .card-done:hover{color:#4ade80}
+    .card.done .card-title{text-decoration:line-through;color:var(--text3)}
+    .card.done{opacity:.7}
     .tag-group-cards .card{width:260px;cursor:default}
 
     /* ── Add column ── */
@@ -372,8 +376,9 @@ function makeColumn(col, tasks) {
   el.className = 'column';
   el.dataset.colId = col.id;
 
-  const sysIcon = col.is_system ? '<span title="Системная колонка — не удаляется" style="font-size:11px;opacity:.6">🔒</span>' : '';
-  const delBtn = col.is_system ? '' : '<button data-action="del" class="del">🗑 Удалить</button>';
+  const isSystem = !!col.system_kind;
+  const sysIcon = isSystem ? '<span title="Системная колонка — не удаляется" style="font-size:11px;opacity:.6">🔒</span>' : '';
+  const delBtn = isSystem ? '' : '<button data-action="del" class="del">🗑 Удалить</button>';
 
   el.innerHTML = `
     <div class="col-header" draggable="true">
@@ -512,8 +517,11 @@ function makeCardHTML(t, showColumn) {
   const tagsHTML = (t.tags||[]).map(tag =>
     `<span class="badge badge-tag" data-tag="${esc(tag)}">#${esc(tag)}</span>`
   ).join('');
+  const doneClass = t.done_at ? ' done' : '';
+  const doneBtn = t.done_at ? '' : '<button class="card-done" title="Выполнено">✓</button>';
   return `
-    <div class="card" data-id="${t.id}" draggable="true">
+    <div class="card${doneClass}" data-id="${t.id}" draggable="true">
+      ${doneBtn}
       <button class="card-del" title="Удалить">✕</button>
       <div class="card-title">${esc(t.title)}</div>
       <div class="card-meta">
@@ -540,9 +548,19 @@ function bindCardEvents(card) {
     load();
   });
 
+  const doneBtn = card.querySelector('.card-done');
+  if (doneBtn) {
+    doneBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      await fetch(`${API}/tasks/${id}/complete`, {method:'POST'});
+      toast('✅ Выполнено');
+      load();
+    });
+  }
+
   // Клик по карточке (кроме кнопок и тегов) — открыть редактирование
   card.addEventListener('click', e => {
-    if (e.target.closest('.card-del') || e.target.closest('.badge-tag')) return;
+    if (e.target.closest('.card-del') || e.target.closest('.card-done') || e.target.closest('.badge-tag')) return;
     const task = state.tasks.find(t => t.id === id);
     if (!task) return;
     openEditModal(task);

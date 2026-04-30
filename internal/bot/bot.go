@@ -177,7 +177,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 			b.send(msg.Chat.ID, "Использование: /done <id>")
 			return
 		}
-		b.cmdDone(ctx, msg.Chat.ID, parts[1])
+		b.cmdDone(ctx, msg.Chat.ID, msg.From.ID, parts[1])
 	case "/projects":
 		b.cmdProjects(ctx, msg.Chat.ID)
 	case "/link":
@@ -220,15 +220,29 @@ func (b *Bot) cmdOverdue(ctx context.Context, chatID int64) {
 	b.send(chatID, formatOverdueTasks("⚠️ Просроченные", tasks))
 }
 
-func (b *Bot) cmdDone(ctx context.Context, chatID int64, idStr string) {
+func (b *Bot) cmdDone(ctx context.Context, chatID int64, telegramUserID int64, idStr string) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		b.send(chatID, "Неверный ID задачи.")
 		return
 	}
-	if err := b.queries.CompleteTask(ctx, id); err != nil {
-		b.send(chatID, "❌ Ошибка: "+err.Error())
-		return
+
+	// Если пользователь привязан — переносим в его Done колонку
+	user, uerr := b.queries.GetUserByTelegramID(ctx, &telegramUserID)
+	if uerr == nil {
+		_, _ = b.queries.EnsureDoneColumn(ctx, &user.ID)
+		if err := b.queries.CompleteTaskForUser(ctx, db.CompleteTaskForUserParams{
+			ID: id, UserID: &user.ID,
+		}); err != nil {
+			b.send(chatID, "❌ Ошибка: "+err.Error())
+			return
+		}
+	} else {
+		// Не привязан — старое поведение, просто ставим done_at
+		if err := b.queries.CompleteTask(ctx, id); err != nil {
+			b.send(chatID, "❌ Ошибка: "+err.Error())
+			return
+		}
 	}
 	b.send(chatID, fmt.Sprintf("✅ Задача #%d закрыта!", id))
 }
@@ -255,10 +269,11 @@ func (b *Bot) cmdLink(ctx context.Context, chatID int64, telegramUserID int64, t
 		TelegramUserID: &telegramUserID,
 	})
 
-	// Кладём claimed задачи (без колонки) в системную TO DO колонку
-	if sysCol, err := b.queries.EnsureSystemColumn(ctx, &row.UserID); err == nil {
+	// Гарантируем обе системные колонки
+	_, _ = b.queries.EnsureDoneColumn(ctx, &row.UserID)
+	if todoCol, err := b.queries.EnsureTodoColumn(ctx, &row.UserID); err == nil {
 		_ = b.queries.MoveOrphanTasksToColumn(ctx, db.MoveOrphanTasksToColumnParams{
-			ColumnID: sysCol.ID,
+			ColumnID: todoCol.ID,
 			UserID:   &row.UserID,
 		})
 	}

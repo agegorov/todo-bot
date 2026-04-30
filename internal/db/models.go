@@ -9,13 +9,13 @@ import (
 )
 
 type BoardColumn struct {
-	ID        int64              `json:"id"`
-	Name      string             `json:"name"`
-	Color     string             `json:"color"`
-	Position  int32              `json:"position"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UserID    *int64             `json:"user_id"`
-	IsSystem  bool               `json:"is_system"`
+	ID         int64              `json:"id"`
+	Name       string             `json:"name"`
+	Color      string             `json:"color"`
+	Position   int32              `json:"position"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UserID     *int64             `json:"user_id"`
+	SystemKind *string            `json:"system_kind"`
 }
 
 type LinkToken struct {
