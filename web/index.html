@@ -130,12 +130,9 @@
     .badge-col{background:var(--bg3);color:var(--text3);border:1px solid var(--border2)}
     .pdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
     .p1{background:#f87171}.p2{background:#fbbf24}.p3{background:#4ade80}
-    .card-del,.card-edit{position:absolute;background:none;border:none;font-size:13px;cursor:pointer;display:none;transition:color .15s}
-    .card-del{top:7px;right:7px;color:var(--border2)}
-    .card-edit{top:7px;right:26px;color:var(--border2)}
-    .card:hover .card-del,.card:hover .card-edit{display:block}
+    .card-del{position:absolute;top:7px;right:7px;background:none;border:none;font-size:13px;cursor:pointer;display:none;color:var(--border2);transition:color .15s}
+    .card:hover .card-del{display:block}
     .card-del:hover{color:#f87171}
-    .card-edit:hover{color:var(--accent)}
     .tag-group-cards .card{width:260px;cursor:default}
 
     /* ── Add column ── */
@@ -517,7 +514,6 @@ function makeCardHTML(t, showColumn) {
   ).join('');
   return `
     <div class="card" data-id="${t.id}" draggable="true">
-      <button class="card-edit" title="Редактировать">✏️</button>
       <button class="card-del" title="Удалить">✕</button>
       <div class="card-title">${esc(t.title)}</div>
       <div class="card-meta">
@@ -544,8 +540,9 @@ function bindCardEvents(card) {
     load();
   });
 
-  card.querySelector('.card-edit').addEventListener('click', e => {
-    e.stopPropagation();
+  // Клик по карточке (кроме кнопок и тегов) — открыть редактирование
+  card.addEventListener('click', e => {
+    if (e.target.closest('.card-del') || e.target.closest('.badge-tag')) return;
     const task = state.tasks.find(t => t.id === id);
     if (!task) return;
     openEditModal(task);
