@@ -139,7 +139,15 @@ func (b *Bot) createTaskFromText(ctx context.Context, text string, chatID int64,
 		return nil, fmt.Errorf("сохранение задачи: %w", err)
 	}
 
-	for _, tagName := range parsed.Tags {
+	// Все задачи созданные через Telegram автоматически помечаются #telegram
+	tags := append(parsed.Tags, "telegram")
+	seen := make(map[string]bool, len(tags))
+	for _, tagName := range tags {
+		key := strings.ToLower(tagName)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		tag, err := b.queries.UpsertTag(ctx, tagName)
 		if err != nil {
 			continue
