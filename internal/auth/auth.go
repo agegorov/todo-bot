@@ -105,6 +105,9 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	_ = h.queries.ClaimOrphanData(r.Context(), int64Ptr(user.ID))
 	_ = h.queries.ClaimOrphanTasks(r.Context(), int64Ptr(user.ID))
 
+	// Гарантируем что у пользователя есть системная колонка TO DO
+	_, _ = h.queries.EnsureSystemColumn(r.Context(), int64Ptr(user.ID))
+
 	// Создаём сессию
 	sessionToken := uuid.New().String()
 	expires := time.Now().Add(sessionTTL)

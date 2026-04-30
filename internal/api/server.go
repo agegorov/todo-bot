@@ -148,8 +148,7 @@ func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
 func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	u := auth.UserFromContext(r.Context())
 	var body struct {
-		Text     string `json:"text"`
-		ColumnID int64  `json:"column_id"`
+		Text string `json:"text"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Text == "" {
 		jsonError(w, nil, 400)
@@ -197,16 +196,11 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	colID := body.ColumnID
-	if colID == 0 {
-		cols, _ := s.queries.ListColumns(r.Context(), &u.ID)
-		if len(cols) > 0 {
-			colID = cols[0].ID
-		}
-	}
-	if colID > 0 {
+	// Новые задачи всегда попадают в системную колонку (TO DO)
+	sysCol, sysErr := s.queries.EnsureSystemColumn(r.Context(), &u.ID)
+	if sysErr == nil {
 		_ = s.queries.MoveTaskToColumn(r.Context(), db.MoveTaskToColumnParams{
-			ID: task.ID, ColumnID: colID,
+			ID: task.ID, ColumnID: sysCol.ID,
 			UserID: &u.ID,
 		})
 	}

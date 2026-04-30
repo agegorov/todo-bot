@@ -14,6 +14,9 @@ ORDER BY t.priority, t.deadline NULLS LAST, t.created_at;
 -- name: MoveTaskToColumn :exec
 UPDATE tasks SET column_id = $2 WHERE id = $1 AND user_id = $3;
 
+-- name: MoveOrphanTasksToColumn :exec
+UPDATE tasks SET column_id = $1 WHERE user_id = $2 AND column_id IS NULL;
+
 -- name: ListColumns :many
 SELECT * FROM board_columns WHERE user_id = $1 ORDER BY position, id;
 
@@ -26,7 +29,17 @@ RETURNING *;
 UPDATE board_columns SET name = $2, color = $3 WHERE id = $1 AND user_id = $4;
 
 -- name: DeleteColumn :exec
-DELETE FROM board_columns WHERE id = $1 AND user_id = $2;
+DELETE FROM board_columns WHERE id = $1 AND user_id = $2 AND is_system = FALSE;
+
+-- name: GetSystemColumn :one
+SELECT * FROM board_columns WHERE user_id = $1 AND is_system = TRUE LIMIT 1;
+
+-- name: EnsureSystemColumn :one
+INSERT INTO board_columns (name, color, position, user_id, is_system)
+VALUES ('📥 TO DO', '#60a5fa', 0, $1, TRUE)
+ON CONFLICT (user_id) WHERE is_system = TRUE
+DO UPDATE SET name = board_columns.name
+RETURNING *;
 
 -- name: ReorderColumns :exec
 UPDATE board_columns SET position = $2 WHERE id = $1 AND user_id = $3;

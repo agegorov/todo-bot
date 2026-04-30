@@ -375,16 +375,20 @@ function makeColumn(col, tasks) {
   el.className = 'column';
   el.dataset.colId = col.id;
 
+  const sysIcon = col.is_system ? '<span title="Системная колонка — не удаляется" style="font-size:11px;opacity:.6">🔒</span>' : '';
+  const delBtn = col.is_system ? '' : '<button data-action="del" class="del">🗑 Удалить</button>';
+
   el.innerHTML = `
     <div class="col-header" draggable="true">
       <span class="col-dot" style="background:${col.color}"></span>
       <div class="col-title" contenteditable="true" spellcheck="false">${esc(col.name)}</div>
+      ${sysIcon}
       <span class="col-count">${colTasks.length}</span>
       <div class="col-menu">
         <button class="col-menu-btn">⋯</button>
         <div class="dropdown">
           <button data-action="edit">✏️ Переименовать</button>
-          <button data-action="del" class="del">🗑 Удалить</button>
+          ${delBtn}
         </div>
       </div>
     </div>
@@ -410,7 +414,8 @@ function makeColumn(col, tasks) {
   menuBtn.addEventListener('click', e => { e.stopPropagation(); dropdown.classList.toggle('open'); });
   document.addEventListener('click', () => dropdown.classList.remove('open'));
   dropdown.querySelector('[data-action="edit"]').addEventListener('click', () => openModal('edit', col));
-  dropdown.querySelector('[data-action="del"]').addEventListener('click', () => deleteColumn(col));
+  const delBtnEl = dropdown.querySelector('[data-action="del"]');
+  if (delBtnEl) delBtnEl.addEventListener('click', () => deleteColumn(col));
 
   // Column drag
   const header = el.querySelector('.col-header');
@@ -612,8 +617,7 @@ document.getElementById('addForm').addEventListener('submit', async e=>{
   const input = document.getElementById('taskInput');
   const text = input.value.trim();
   if(!text) return;
-  const firstColId = state.columns[0]?.id ?? null;
-  await fetch(`${API}/tasks`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,column_id:firstColId})});
+  await fetch(`${API}/tasks`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
   input.value='';
   toast('✅ Задача создана');
   load();

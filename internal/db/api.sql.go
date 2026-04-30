@@ -14,7 +14,7 @@ import (
 const createColumn = `-- name: CreateColumn :one
 INSERT INTO board_columns (name, color, position, user_id)
 VALUES ($1, $2, (SELECT COALESCE(MAX(position),0)+1 FROM board_columns WHERE user_id = $3), $3)
-RETURNING id, name, color, position, created_at, user_id
+RETURNING id, name, color, position, created_at, user_id, is_system
 `
 
 type CreateColumnParams struct {
@@ -33,12 +33,13 @@ func (q *Queries) CreateColumn(ctx context.Context, arg CreateColumnParams) (Boa
 		&i.Position,
 		&i.CreatedAt,
 		&i.UserID,
+		&i.IsSystem,
 	)
 	return i, err
 }
 
 const deleteColumn = `-- name: DeleteColumn :exec
-DELETE FROM board_columns WHERE id = $1 AND user_id = $2
+DELETE FROM board_columns WHERE id = $1 AND user_id = $2 AND is_system = FALSE
 `
 
 type DeleteColumnParams struct {
@@ -60,8 +61,50 @@ func (q *Queries) DeleteTaskTags(ctx context.Context, taskID int64) error {
 	return err
 }
 
+const ensureSystemColumn = `-- name: EnsureSystemColumn :one
+INSERT INTO board_columns (name, color, position, user_id, is_system)
+VALUES ('📥 TO DO', '#60a5fa', 0, $1, TRUE)
+ON CONFLICT (user_id) WHERE is_system = TRUE
+DO UPDATE SET name = board_columns.name
+RETURNING id, name, color, position, created_at, user_id, is_system
+`
+
+func (q *Queries) EnsureSystemColumn(ctx context.Context, userID *int64) (BoardColumn, error) {
+	row := q.db.QueryRow(ctx, ensureSystemColumn, userID)
+	var i BoardColumn
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Color,
+		&i.Position,
+		&i.CreatedAt,
+		&i.UserID,
+		&i.IsSystem,
+	)
+	return i, err
+}
+
+const getSystemColumn = `-- name: GetSystemColumn :one
+SELECT id, name, color, position, created_at, user_id, is_system FROM board_columns WHERE user_id = $1 AND is_system = TRUE LIMIT 1
+`
+
+func (q *Queries) GetSystemColumn(ctx context.Context, userID *int64) (BoardColumn, error) {
+	row := q.db.QueryRow(ctx, getSystemColumn, userID)
+	var i BoardColumn
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Color,
+		&i.Position,
+		&i.CreatedAt,
+		&i.UserID,
+		&i.IsSystem,
+	)
+	return i, err
+}
+
 const listColumns = `-- name: ListColumns :many
-SELECT id, name, color, position, created_at, user_id FROM board_columns WHERE user_id = $1 ORDER BY position, id
+SELECT id, name, color, position, created_at, user_id, is_system FROM board_columns WHERE user_id = $1 ORDER BY position, id
 `
 
 func (q *Queries) ListColumns(ctx context.Context, userID *int64) ([]BoardColumn, error) {
@@ -80,6 +123,7 @@ func (q *Queries) ListColumns(ctx context.Context, userID *int64) ([]BoardColumn
 			&i.Position,
 			&i.CreatedAt,
 			&i.UserID,
+			&i.IsSystem,
 		); err != nil {
 			return nil, err
 		}
@@ -151,6 +195,20 @@ func (q *Queries) ListTasksForBoard(ctx context.Context, userID *int64) ([]ListT
 		return nil, err
 	}
 	return items, nil
+}
+
+const moveOrphanTasksToColumn = `-- name: MoveOrphanTasksToColumn :exec
+UPDATE tasks SET column_id = $1 WHERE user_id = $2 AND column_id IS NULL
+`
+
+type MoveOrphanTasksToColumnParams struct {
+	ColumnID int64  `json:"column_id"`
+	UserID   *int64 `json:"user_id"`
+}
+
+func (q *Queries) MoveOrphanTasksToColumn(ctx context.Context, arg MoveOrphanTasksToColumnParams) error {
+	_, err := q.db.Exec(ctx, moveOrphanTasksToColumn, arg.ColumnID, arg.UserID)
+	return err
 }
 
 const moveTaskToColumn = `-- name: MoveTaskToColumn :exec

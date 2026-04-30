@@ -15,6 +15,7 @@ type BoardColumn struct {
 	Position  int32              `json:"position"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UserID    *int64             `json:"user_id"`
+	IsSystem  bool               `json:"is_system"`
 }
 
 type LinkToken struct {

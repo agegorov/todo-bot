@@ -255,6 +255,14 @@ func (b *Bot) cmdLink(ctx context.Context, chatID int64, telegramUserID int64, t
 		TelegramUserID: &telegramUserID,
 	})
 
+	// Кладём claimed задачи (без колонки) в системную TO DO колонку
+	if sysCol, err := b.queries.EnsureSystemColumn(ctx, &row.UserID); err == nil {
+		_ = b.queries.MoveOrphanTasksToColumn(ctx, db.MoveOrphanTasksToColumnParams{
+			ColumnID: sysCol.ID,
+			UserID:   &row.UserID,
+		})
+	}
+
 	// Удаляем использованный токен
 	_ = b.queries.DeleteLinkToken(ctx, token)
 
