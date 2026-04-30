@@ -109,6 +109,7 @@ func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
 		Notes        *string  `json:"notes"`
 		Priority     int16    `json:"priority"`
 		Deadline     *string  `json:"deadline"`
+		DeadlineRaw  *string  `json:"deadline_raw"`
 		ColumnID     int64    `json:"column_id"`
 		ProjectName  string   `json:"project_name"`
 		ProjectColor string   `json:"project_color"`
@@ -118,10 +119,12 @@ func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := make([]taskResp, len(tasks))
 	for i, t := range tasks {
-		var dl *string
+		var dl, dlRaw *string
 		if t.Deadline.Valid {
 			s := t.Deadline.Time.Format("02 Jan 15:04")
 			dl = &s
+			r := t.Deadline.Time.Format("2006-01-02T15:04")
+			dlRaw = &r
 		}
 		var tags []string
 		switch v := t.Tags.(type) {
@@ -144,7 +147,8 @@ func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
 		}
 		resp[i] = taskResp{
 			ID: t.ID, Title: t.Title, Notes: t.Notes,
-			Priority: t.Priority, Deadline: dl, ColumnID: t.ColumnID,
+			Priority: t.Priority, Deadline: dl, DeadlineRaw: dlRaw,
+			ColumnID: t.ColumnID,
 			ProjectName: t.ProjectName, ProjectColor: t.ProjectColor,
 			DelegatedTo: t.DelegatedTo, Tags: tags,
 			DoneAt: doneAt,

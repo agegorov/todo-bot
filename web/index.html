@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Todo Board</title>
+
+  <!-- timepicker-ui (Material 3 циферблат, vanilla, без зависимостей) -->
+  <script src="https://cdn.jsdelivr.net/npm/timepicker-ui@2.7.5/dist/timepicker-ui.umd.js"></script>
+
   <style>
     /* ── Темы ── */
     :root{
@@ -174,6 +178,35 @@
     .tag-pill button:hover{color:#f87171}
     .tags-input{background:none;border:none;outline:none;color:var(--text);font-size:13px;min-width:80px;flex:1}
 
+    /* ── Date/time picker ── */
+    .dt-presets{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+    .dt-preset{background:var(--bg3);border:1px solid var(--border2);border-radius:14px;padding:3px 10px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s}
+    .dt-preset:hover{border-color:var(--accent);color:var(--accent)}
+    .dt-preset.clear{color:#f87171;border-color:transparent}
+    .dt-preset.clear:hover{border-color:#f87171}
+    .dt-row{display:flex;gap:8px}
+    .dt-row input{flex:1}
+    .dt-row .time-wrap{position:relative;flex:0 0 110px}
+    .dt-row .time-wrap input{padding-right:30px}
+    .dt-row .time-wrap::after{content:'🕐';position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px;opacity:.6}
+
+    /* timepicker-ui — встраиваем минимальные стили под нашу тему.
+       Библиотека инжектит свой shadow-DOM/обычный modal — здесь только
+       лёгкая подгонка цветов через CSS-переменные. Всё что не задано — берёт дефолты. */
+    .timepicker-ui-modal{--tui-color-primary:var(--accent);--tui-color-primary-light:var(--accent2)}
+    .timepicker-ui-wrapper{background:var(--bg2)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:14px!important}
+    .timepicker-ui-header{background:var(--bg3)!important;color:var(--text)!important}
+    .timepicker-ui-clock-face{background:var(--bg3)!important}
+    .timepicker-ui-circle-hand,.timepicker-ui-circle{background:var(--accent)!important}
+    .timepicker-ui-clock-hand{background:var(--accent)!important}
+    .timepicker-ui-value-tips,.timepicker-ui-value-tips-24h{color:var(--text)!important}
+    .timepicker-ui-value-tips.active,.timepicker-ui-value-tips-24h.active{background:var(--accent)!important;color:#fff!important}
+    .timepicker-ui-hour,.timepicker-ui-minutes{color:var(--text)!important;background:var(--bg2)!important}
+    .timepicker-ui-hour.active,.timepicker-ui-minutes.active{background:var(--bg4)!important;color:var(--accent)!important}
+    .timepicker-ui-footer{background:var(--bg2)!important}
+    .timepicker-ui-cancel-btn,.timepicker-ui-ok-btn{color:var(--accent)!important}
+    .timepicker-ui-overlay{background:#00000080!important}
+
     /* ── Toast ── */
     .toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;z-index:300;color:var(--text)}
     .toast.show{opacity:1;transform:translateY(0)}
@@ -244,7 +277,18 @@
     </div>
     <div class="field">
       <label>Дедлайн</label>
-      <input type="datetime-local" id="editDeadline">
+      <div class="dt-presets" id="dtPresets">
+        <button type="button" class="dt-preset" data-preset="today-eve">Сегодня 18:00</button>
+        <button type="button" class="dt-preset" data-preset="tomorrow-morn">Завтра 9:00</button>
+        <button type="button" class="dt-preset" data-preset="tomorrow-eve">Завтра 18:00</button>
+        <button type="button" class="dt-preset" data-preset="friday">В пятницу</button>
+        <button type="button" class="dt-preset" data-preset="next-week">Через неделю</button>
+        <button type="button" class="dt-preset clear" data-preset="clear">✕ Без срока</button>
+      </div>
+      <div class="dt-row">
+        <input type="date" id="editDate">
+        <div class="time-wrap"><input type="text" id="editTime" placeholder="HH:MM" readonly></div>
+      </div>
     </div>
     <div class="field">
       <label>Теги</label>
@@ -666,7 +710,16 @@ function openEditModal(task) {
 
   document.getElementById('editTitle').value = task.title || '';
   document.getElementById('editNotes').value = task.notes || '';
-  document.getElementById('editDeadline').value = task.deadlineRaw || '';
+
+  // Раскладываем "2026-04-27T18:00" на дату и время
+  if (task.deadline_raw) {
+    const [d, t] = task.deadline_raw.split('T');
+    document.getElementById('editDate').value = d || '';
+    document.getElementById('editTime').value = (t || '').slice(0, 5);
+  } else {
+    document.getElementById('editDate').value = '';
+    document.getElementById('editTime').value = '';
+  }
 
   renderEditTags();
   renderPriorityBtns();
@@ -674,6 +727,64 @@ function openEditModal(task) {
   document.getElementById('editModal').classList.add('open');
   setTimeout(() => document.getElementById('editTitle').focus(), 50);
 }
+
+// ── timepicker-ui (Material 3 циферблат, 24-часовой) ────────────────────────
+(function () {
+  const timeEl = document.getElementById('editTime');
+  if (!timeEl || !window.timepickerUi) return;
+  const tp = new window.timepickerUi.TimepickerUI(timeEl, {
+    clockType: '24h',
+    theme: 'm3',
+    mobile: false,
+    enableSwitchIcon: false,
+    cancelLabel: 'Отмена',
+    okLabel: 'Готово',
+    hourMobileLabel: 'часы',
+    minuteMobileLabel: 'мин',
+    backdrop: true,
+    focusInputAfterCloseModal: true,
+  });
+  tp.create();
+
+  timeEl.addEventListener('accept', e => {
+    const h = String(e.detail.hour).padStart(2, '0');
+    const m = String(e.detail.minutes).padStart(2, '0');
+    timeEl.value = `${h}:${m}`;
+  });
+})();
+
+// ── Date/time presets ────────────────────────────────────────────────────────
+function pad(n) { return String(n).padStart(2, '0'); }
+function setDateTime(d, hour, min) {
+  document.getElementById('editDate').value =
+    `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  document.getElementById('editTime').value = `${pad(hour)}:${pad(min)}`;
+}
+function nextWeekday(target) {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  while (d.getDay() !== target) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+document.querySelectorAll('.dt-preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const now = new Date();
+    const tomorrow = new Date(); tomorrow.setDate(now.getDate() + 1);
+    const nextWeek = new Date(); nextWeek.setDate(now.getDate() + 7);
+    switch (btn.dataset.preset) {
+      case 'today-eve':     setDateTime(now, 18, 0); break;
+      case 'tomorrow-morn': setDateTime(tomorrow, 9, 0); break;
+      case 'tomorrow-eve':  setDateTime(tomorrow, 18, 0); break;
+      case 'friday':        setDateTime(nextWeekday(5), 18, 0); break;
+      case 'next-week':     setDateTime(nextWeek, 9, 0); break;
+      case 'clear':
+        document.getElementById('editDate').value = '';
+        document.getElementById('editTime').value = '';
+        break;
+    }
+  });
+});
 
 function renderEditTags() {
   const wrap = document.getElementById('tagsWrap');
@@ -721,6 +832,10 @@ document.getElementById('editModal').addEventListener('click', e => { if (e.targ
 document.getElementById('editSave').addEventListener('click', async () => {
   const title = document.getElementById('editTitle').value.trim();
   if (!title) return;
+  const d = document.getElementById('editDate').value;
+  const t = document.getElementById('editTime').value;
+  let deadline = '';
+  if (d) deadline = `${d}T${t || '09:00'}`;
   await fetch(`${API}/tasks/${editTaskId}`, {
     method: 'PUT',
     headers: {'Content-Type': 'application/json'},
@@ -728,7 +843,7 @@ document.getElementById('editSave').addEventListener('click', async () => {
       title,
       notes: document.getElementById('editNotes').value.trim(),
       priority: editPriority,
-      deadline: document.getElementById('editDeadline').value || '',
+      deadline,
       tags: editTags,
     })
   });
