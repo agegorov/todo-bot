@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Todo Board</title>
 
-  <!-- timepicker-ui (Material 3 циферблат, vanilla, без зависимостей) -->
-  <script src="https://cdn.jsdelivr.net/npm/timepicker-ui@2.7.5/dist/timepicker-ui.umd.js"></script>
 
   <style>
     /* ── Темы ── */
@@ -186,26 +184,11 @@
     .dt-preset.clear:hover{border-color:#f87171}
     .dt-row{display:flex;gap:8px}
     .dt-row input{flex:1}
-    .dt-row .time-wrap{position:relative;flex:0 0 110px}
-    .dt-row .time-wrap input{padding-right:30px}
-    .dt-row .time-wrap::after{content:'🕐';position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px;opacity:.6}
+    .dt-row input[type="time"]{flex:0 0 110px}
 
-    /* timepicker-ui — встраиваем минимальные стили под нашу тему.
-       Библиотека инжектит свой shadow-DOM/обычный modal — здесь только
-       лёгкая подгонка цветов через CSS-переменные. Всё что не задано — берёт дефолты. */
-    .timepicker-ui-modal{--tui-color-primary:var(--accent);--tui-color-primary-light:var(--accent2)}
-    .timepicker-ui-wrapper{background:var(--bg2)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:14px!important}
-    .timepicker-ui-header{background:var(--bg3)!important;color:var(--text)!important}
-    .timepicker-ui-clock-face{background:var(--bg3)!important}
-    .timepicker-ui-circle-hand,.timepicker-ui-circle{background:var(--accent)!important}
-    .timepicker-ui-clock-hand{background:var(--accent)!important}
-    .timepicker-ui-value-tips,.timepicker-ui-value-tips-24h{color:var(--text)!important}
-    .timepicker-ui-value-tips.active,.timepicker-ui-value-tips-24h.active{background:var(--accent)!important;color:#fff!important}
-    .timepicker-ui-hour,.timepicker-ui-minutes{color:var(--text)!important;background:var(--bg2)!important}
-    .timepicker-ui-hour.active,.timepicker-ui-minutes.active{background:var(--bg4)!important;color:var(--accent)!important}
-    .timepicker-ui-footer{background:var(--bg2)!important}
-    .timepicker-ui-cancel-btn,.timepicker-ui-ok-btn{color:var(--accent)!important}
-    .timepicker-ui-overlay{background:#00000080!important}
+    .dt-row input[type="time"]{font-family:inherit;cursor:pointer}
+    .dt-row input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;filter:invert(.7)}
+    [data-theme="light"] .dt-row input[type="time"]::-webkit-calendar-picker-indicator{filter:none}
 
     /* ── Toast ── */
     .toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;z-index:300;color:var(--text)}
@@ -287,7 +270,7 @@
       </div>
       <div class="dt-row">
         <input type="date" id="editDate">
-        <div class="time-wrap"><input type="text" id="editTime" placeholder="HH:MM" readonly></div>
+        <input type="time" id="editTime" step="60">
       </div>
     </div>
     <div class="field">
@@ -727,31 +710,6 @@ function openEditModal(task) {
   document.getElementById('editModal').classList.add('open');
   setTimeout(() => document.getElementById('editTitle').focus(), 50);
 }
-
-// ── timepicker-ui (Material 3 циферблат, 24-часовой) ────────────────────────
-(function () {
-  const timeEl = document.getElementById('editTime');
-  if (!timeEl || !window.timepickerUi) return;
-  const tp = new window.timepickerUi.TimepickerUI(timeEl, {
-    clockType: '24h',
-    theme: 'm3',
-    mobile: false,
-    enableSwitchIcon: false,
-    cancelLabel: 'Отмена',
-    okLabel: 'Готово',
-    hourMobileLabel: 'часы',
-    minuteMobileLabel: 'мин',
-    backdrop: true,
-    focusInputAfterCloseModal: true,
-  });
-  tp.create();
-
-  timeEl.addEventListener('accept', e => {
-    const h = String(e.detail.hour).padStart(2, '0');
-    const m = String(e.detail.minutes).padStart(2, '0');
-    timeEl.value = `${h}:${m}`;
-  });
-})();
 
 // ── Date/time presets ────────────────────────────────────────────────────────
 function pad(n) { return String(n).padStart(2, '0'); }
