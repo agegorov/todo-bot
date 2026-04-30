@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Todo Board</title>
 
+  <!-- timepicker-ui: Material 3 циферблат (vanilla, без зависимостей) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/timepicker-ui@2.7.5/dist/style.css">
 
   <style>
     /* ── Темы ── */
@@ -183,12 +185,24 @@
     .dt-preset.clear{color:#f87171;border-color:transparent}
     .dt-preset.clear:hover{border-color:#f87171}
     .dt-row{display:flex;gap:8px}
-    .dt-row input{flex:1}
-    .dt-row input[type="time"]{flex:0 0 110px}
+    .dt-row > input[type="date"]{flex:1}
+    .dt-row .timepicker-ui{flex:0 0 110px;position:relative}
+    .dt-row .timepicker-ui input{cursor:pointer;width:100%}
+    .dt-row .timepicker-ui::after{content:'🕐';position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px;opacity:.55}
 
-    .dt-row input[type="time"]{font-family:inherit;cursor:pointer}
-    .dt-row input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;filter:invert(.7)}
-    [data-theme="light"] .dt-row input[type="time"]::-webkit-calendar-picker-indicator{filter:none}
+    /* timepicker-ui тёмная тема */
+    .timepicker-ui-modal{z-index:300}
+    .timepicker-ui-wrapper{background:var(--bg2)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:14px!important}
+    .timepicker-ui-header{background:var(--bg3)!important;color:var(--text)!important}
+    .timepicker-ui-clock-face,.timepicker-ui-circle{background:var(--bg3)!important}
+    .timepicker-ui-circle-hand,.timepicker-ui-clock-hand{background:var(--accent)!important}
+    .timepicker-ui-value-tips,.timepicker-ui-value-tips-24h{color:var(--text)!important}
+    .timepicker-ui-value-tips.active,.timepicker-ui-value-tips-24h.active{background:var(--accent)!important;color:#fff!important}
+    .timepicker-ui-hour,.timepicker-ui-minutes{color:var(--text)!important;background:transparent!important}
+    .timepicker-ui-hour.active,.timepicker-ui-minutes.active{color:var(--accent)!important}
+    .timepicker-ui-cancel-btn,.timepicker-ui-ok-btn{color:var(--accent)!important;background:transparent!important}
+    .timepicker-ui-cancel-btn:hover,.timepicker-ui-ok-btn:hover{background:var(--bg4)!important}
+    .timepicker-ui-overlay{background:#00000080!important}
 
     /* ── Toast ── */
     .toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;z-index:300;color:var(--text)}
@@ -270,7 +284,9 @@
       </div>
       <div class="dt-row">
         <input type="date" id="editDate">
-        <input type="time" id="editTime" step="60">
+        <div class="timepicker-ui" id="editTimeWrap">
+          <input type="text" class="timepicker-ui-input" id="editTime" placeholder="HH:MM" readonly>
+        </div>
       </div>
     </div>
     <div class="field">
@@ -703,6 +719,7 @@ function openEditModal(task) {
     document.getElementById('editDate').value = '';
     document.getElementById('editTime').value = '';
   }
+  tpSync();
 
   renderEditTags();
   renderPriorityBtns();
@@ -711,12 +728,23 @@ function openEditModal(task) {
   setTimeout(() => document.getElementById('editTitle').focus(), 50);
 }
 
+// ── timepicker-ui sync ───────────────────────────────────────────────────────
+function tpSync() {
+  // Подсунуть текущее значение #editTime в пикер (после пресета или открытия модалки)
+  const tp = window.__tpInstance;
+  if (!tp) return;
+  const v = (document.getElementById('editTime').value || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!v) return;
+  try { tp.update({ hour: +v[1], minutes: +v[2] }); } catch(e) {}
+}
+
 // ── Date/time presets ────────────────────────────────────────────────────────
 function pad(n) { return String(n).padStart(2, '0'); }
 function setDateTime(d, hour, min) {
   document.getElementById('editDate').value =
     `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   document.getElementById('editTime').value = `${pad(hour)}:${pad(min)}`;
+  tpSync();
 }
 function nextWeekday(target) {
   const d = new Date();
@@ -866,5 +894,35 @@ loadMe();
 load();
 setInterval(load, 30000);
 </script>
+
+<!-- timepicker-ui подгружается как ESM (нет UMD-сборки на CDN) -->
+<script type="module">
+  import { TimepickerUI } from 'https://cdn.jsdelivr.net/npm/timepicker-ui@2.7.5/+esm';
+
+  const wrap = document.getElementById('editTimeWrap');
+  const input = document.getElementById('editTime');
+
+  const tp = new TimepickerUI(wrap, {
+    clockType: '24h',
+    theme: 'm3',
+    mobile: false,
+    enableSwitchIcon: false,
+    cancelLabel: 'Отмена',
+    okLabel: 'Готово',
+    hourMobileLabel: 'Часы',
+    minuteMobileLabel: 'Минуты',
+    backdrop: true,
+    focusInputAfterCloseModal: true,
+  });
+  tp.create();
+  window.__tpInstance = tp;
+
+  wrap.addEventListener('accept', e => {
+    const h = String(e.detail.hour).padStart(2, '0');
+    const m = String(e.detail.minutes).padStart(2, '0');
+    input.value = `${h}:${m}`;
+  });
+</script>
+
 </body>
 </html>
