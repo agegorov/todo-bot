@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Todo Board</title>
 
-  <!-- timepicker-ui: Material 3 циферблат (vanilla, без зависимостей) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/timepicker-ui@2.7.5/dist/style.css">
+  <!-- timepicker-ui v4: циферблат, vanilla, встроенные темы -->
+  <link rel="stylesheet" href="https://esm.sh/timepicker-ui@4.3.0/dist/css/main.css">
+  <link rel="stylesheet" href="https://esm.sh/timepicker-ui@4.3.0/dist/css/themes/theme-dark.css">
 
   <style>
     /* ── Темы ── */
@@ -186,23 +187,9 @@
     .dt-preset.clear:hover{border-color:#f87171}
     .dt-row{display:flex;gap:8px}
     .dt-row > input[type="date"]{flex:1}
-    .dt-row .timepicker-ui{flex:0 0 110px;position:relative}
-    .dt-row .timepicker-ui input{cursor:pointer;width:100%}
-    .dt-row .timepicker-ui::after{content:'🕐';position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px;opacity:.55}
-
-    /* timepicker-ui тёмная тема */
-    .timepicker-ui-modal{z-index:300}
-    .timepicker-ui-wrapper{background:var(--bg2)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:14px!important}
-    .timepicker-ui-header{background:var(--bg3)!important;color:var(--text)!important}
-    .timepicker-ui-clock-face,.timepicker-ui-circle{background:var(--bg3)!important}
-    .timepicker-ui-circle-hand,.timepicker-ui-clock-hand{background:var(--accent)!important}
-    .timepicker-ui-value-tips,.timepicker-ui-value-tips-24h{color:var(--text)!important}
-    .timepicker-ui-value-tips.active,.timepicker-ui-value-tips-24h.active{background:var(--accent)!important;color:#fff!important}
-    .timepicker-ui-hour,.timepicker-ui-minutes{color:var(--text)!important;background:transparent!important}
-    .timepicker-ui-hour.active,.timepicker-ui-minutes.active{color:var(--accent)!important}
-    .timepicker-ui-cancel-btn,.timepicker-ui-ok-btn{color:var(--accent)!important;background:transparent!important}
-    .timepicker-ui-cancel-btn:hover,.timepicker-ui-ok-btn:hover{background:var(--bg4)!important}
-    .timepicker-ui-overlay{background:#00000080!important}
+    .dt-row .time-wrap{position:relative;flex:0 0 110px}
+    .dt-row .time-wrap input{cursor:pointer;width:100%}
+    .dt-row .time-wrap::after{content:'🕐';position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px;opacity:.55}
 
     /* ── Toast ── */
     .toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;z-index:300;color:var(--text)}
@@ -284,8 +271,8 @@
       </div>
       <div class="dt-row">
         <input type="date" id="editDate">
-        <div class="timepicker-ui" id="editTimeWrap">
-          <input type="text" class="timepicker-ui-input" id="editTime" placeholder="HH:MM" readonly>
+        <div class="time-wrap">
+          <input type="text" id="editTime" placeholder="HH:MM" readonly>
         </div>
       </div>
     </div>
@@ -730,12 +717,12 @@ function openEditModal(task) {
 
 // ── timepicker-ui sync ───────────────────────────────────────────────────────
 function tpSync() {
-  // Подсунуть текущее значение #editTime в пикер (после пресета или открытия модалки)
+  // После пресета или загрузки задачи — подсунуть значение в пикер
   const tp = window.__tpInstance;
   if (!tp) return;
-  const v = (document.getElementById('editTime').value || '').match(/^(\d{1,2}):(\d{2})$/);
-  if (!v) return;
-  try { tp.update({ hour: +v[1], minutes: +v[2] }); } catch(e) {}
+  const v = document.getElementById('editTime').value;
+  if (!/^\d{1,2}:\d{2}$/.test(v)) return;
+  try { tp.setValue(v); } catch(e) {}
 }
 
 // ── Date/time presets ────────────────────────────────────────────────────────
@@ -895,33 +882,30 @@ load();
 setInterval(load, 30000);
 </script>
 
-<!-- timepicker-ui подгружается как ESM (нет UMD-сборки на CDN) -->
+<!-- timepicker-ui v4 (нет UMD-сборки — подгружаем как ESM) -->
 <script type="module">
-  import { TimepickerUI } from 'https://cdn.jsdelivr.net/npm/timepicker-ui@2.7.5/+esm';
+  import { TimepickerUI } from 'https://esm.sh/timepicker-ui@4.3.0';
 
-  const wrap = document.getElementById('editTimeWrap');
   const input = document.getElementById('editTime');
-
-  const tp = new TimepickerUI(wrap, {
-    clockType: '24h',
-    theme: 'm3',
-    mobile: false,
-    enableSwitchIcon: false,
-    cancelLabel: 'Отмена',
-    okLabel: 'Готово',
-    hourMobileLabel: 'Часы',
-    minuteMobileLabel: 'Минуты',
-    backdrop: true,
-    focusInputAfterCloseModal: true,
+  const picker = new TimepickerUI(input, {
+    clock: { type: '24h' },
+    ui: { theme: 'dark', mobile: false, animation: true, backdrop: true },
+    labels: {
+      ok: 'Готово',
+      cancel: 'Отмена',
+      mobileHour: 'Часы',
+      mobileMinute: 'Минуты',
+    },
+    callbacks: {
+      onConfirm: (data) => {
+        const h = String(data.hour).padStart(2, '0');
+        const m = String(data.minutes).padStart(2, '0');
+        input.value = `${h}:${m}`;
+      },
+    },
   });
-  tp.create();
-  window.__tpInstance = tp;
-
-  wrap.addEventListener('accept', e => {
-    const h = String(e.detail.hour).padStart(2, '0');
-    const m = String(e.detail.minutes).padStart(2, '0');
-    input.value = `${h}:${m}`;
-  });
+  picker.create();
+  window.__tpInstance = picker;
 </script>
 
 </body>
