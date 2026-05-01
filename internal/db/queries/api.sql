@@ -1,6 +1,7 @@
 -- name: ListTasksForBoard :many
 SELECT t.id, t.title, t.notes, t.priority, t.deadline,
-       t.column_id, t.delegated_to, t.is_recurring, t.created_at, t.done_at,
+       t.column_id, t.delegated_to, t.is_recurring, t.recur_rule,
+       t.created_at, t.done_at,
        p.name AS project_name, p.color AS project_color,
        COALESCE(array_agg(tg.name ORDER BY tg.name) FILTER (WHERE tg.name IS NOT NULL), '{}') AS tags
 FROM tasks t
@@ -70,7 +71,15 @@ RETURNING *;
 UPDATE board_columns SET position = $2 WHERE id = $1 AND user_id = $3;
 
 -- name: UpdateTask :exec
-UPDATE tasks SET title = $2, notes = $3, priority = $4, deadline = $5 WHERE id = $1 AND user_id = $6;
+UPDATE tasks SET title = $2, notes = $3, priority = $4, deadline = $5,
+                 is_recurring = $7, recur_rule = $8
+WHERE id = $1 AND user_id = $6;
+
+-- name: GetTaskForUser :one
+SELECT * FROM tasks WHERE id = $1 AND user_id = $2;
+
+-- name: ListTagsForTask :many
+SELECT t.* FROM tags t JOIN task_tags tt ON tt.tag_id = t.id WHERE tt.task_id = $1;
 
 -- name: DeleteTaskTags :exec
 DELETE FROM task_tags WHERE task_id = $1;

@@ -130,6 +130,7 @@
     .badge-dl.overdue{background:#3b1f1f;color:#f87171}
     [data-theme="light"] .badge-dl.overdue{background:#fee2e2;color:#dc2626}
     .badge-del{background:var(--badge-del-bg);color:var(--badge-del-color)}
+    .badge-recur{background:var(--badge-proj-bg);color:var(--accent)}
     .badge-tag{background:var(--badge-tag-bg);color:var(--badge-tag-color);cursor:pointer}
     .badge-tag:hover{opacity:.8}
     .badge-col{background:var(--bg3);color:var(--text3);border:1px solid var(--border2)}
@@ -162,8 +163,9 @@
     .edit-modal .modal{width:420px}
     .edit-modal label{display:block;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
     .edit-modal .field{margin-bottom:14px}
-    .edit-modal input,.edit-modal textarea{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical}
-    .edit-modal input:focus,.edit-modal textarea:focus{border-color:var(--accent)}
+    .edit-modal input,.edit-modal textarea,.edit-modal select{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical}
+    .edit-modal input:focus,.edit-modal textarea:focus,.edit-modal select:focus{border-color:var(--accent)}
+    .edit-modal select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none' stroke='%2394a3b8' stroke-width='1.5'><polyline points='1 1 5 5 9 1'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:30px}
     .priority-btns{display:flex;gap:6px}
     .priority-btn{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:6px;color:var(--text3);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
     .priority-btn.active-1{background:#3b1f1f;border-color:#f87171;color:#f87171}
@@ -264,6 +266,17 @@
         <button class="priority-btn" data-p="2">🟡 Средний</button>
         <button class="priority-btn" data-p="3">🟢 Низкий</button>
       </div>
+    </div>
+    <div class="field">
+      <label>Повторение</label>
+      <select id="editRecurrence">
+        <option value="">Не повторяется</option>
+        <option value="daily">Каждый день</option>
+        <option value="weekly">Каждую неделю</option>
+        <option value="biweekly">Каждые 2 недели</option>
+        <option value="monthly">Каждый месяц</option>
+        <option value="yearly">Каждый год</option>
+      </select>
     </div>
     <div class="field">
       <label>Дедлайн</label>
@@ -565,6 +578,7 @@ function makeCardHTML(t, showColumn) {
         <span class="pdot p${t.priority}"></span>
         <span class="badge badge-proj" style="border-left:3px solid ${t.project_color}">${esc(t.project_name)}</span>
         ${t.deadline ? `<span class="badge badge-dl ${overdue}">📅 ${esc(t.deadline)}</span>` : ''}
+        ${t.recurrence ? `<span class="badge badge-recur" title="Повторение: ${esc(t.recurrence)}">🔁</span>` : ''}
         ${t.delegated_to ? `<span class="badge badge-del">👤 ${esc(t.delegated_to)}</span>` : ''}
         ${showColumn && colName ? `<span class="badge badge-col">⬛ ${esc(colName)}</span>` : ''}
         ${tagsHTML}
@@ -703,6 +717,7 @@ function openEditModal(task) {
 
   document.getElementById('editTitle').value = task.title || '';
   document.getElementById('editNotes').value = task.notes || '';
+  document.getElementById('editRecurrence').value = task.recurrence || '';
 
   // Раскладываем "2026-04-27T18:00" на дату и время
   if (task.deadline_raw) {
@@ -825,6 +840,7 @@ document.getElementById('editSave').addEventListener('click', async () => {
       priority: editPriority,
       deadline,
       tags: editTags,
+      recurrence: document.getElementById('editRecurrence').value || '',
     })
   });
   document.getElementById('editModal').classList.remove('open');

@@ -17,6 +17,7 @@ import (
 
 	"github.com/aegorov/todo-bot/internal/db"
 	"github.com/aegorov/todo-bot/internal/parser"
+	"github.com/aegorov/todo-bot/internal/recurrence"
 	"github.com/aegorov/todo-bot/internal/whisper"
 )
 
@@ -239,10 +240,22 @@ func (b *Bot) cmdDone(ctx context.Context, chatID int64, telegramUserID int64, i
 	user, uerr := b.queries.GetUserByTelegramID(ctx, &telegramUserID)
 	if uerr == nil {
 		_, _ = b.queries.EnsureDoneColumn(ctx, &user.ID)
+
+		// Читаем задачу до закрытия — для возможного спавна следующей итерации
+		task, _ := b.queries.GetTaskForUser(ctx, db.GetTaskForUserParams{
+			ID: id, UserID: &user.ID,
+		})
+
 		if err := b.queries.CompleteTaskForUser(ctx, db.CompleteTaskForUserParams{
 			ID: id, UserID: &user.ID,
 		}); err != nil {
 			b.send(chatID, "❌ Ошибка: "+err.Error())
+			return
+		}
+
+		// Если задача периодическая — создаём следующую копию
+		if nextID, _ := recurrence.Spawn(ctx, b.queries, task, user.ID); nextID > 0 {
+			b.send(chatID, fmt.Sprintf("✅ Задача #%d закрыта!\n🔁 Создана следующая итерация #%d", id, nextID))
 			return
 		}
 	} else {

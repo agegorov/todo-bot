@@ -145,6 +145,37 @@ func (q *Queries) GetDoneColumn(ctx context.Context, userID *int64) (BoardColumn
 	return i, err
 }
 
+const getTaskForUser = `-- name: GetTaskForUser :one
+SELECT id, project_id, title, notes, priority, deadline, done_at, delegated_to, is_recurring, recur_rule, created_at, column_id, user_id, telegram_user_id FROM tasks WHERE id = $1 AND user_id = $2
+`
+
+type GetTaskForUserParams struct {
+	ID     int64  `json:"id"`
+	UserID *int64 `json:"user_id"`
+}
+
+func (q *Queries) GetTaskForUser(ctx context.Context, arg GetTaskForUserParams) (Task, error) {
+	row := q.db.QueryRow(ctx, getTaskForUser, arg.ID, arg.UserID)
+	var i Task
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Title,
+		&i.Notes,
+		&i.Priority,
+		&i.Deadline,
+		&i.DoneAt,
+		&i.DelegatedTo,
+		&i.IsRecurring,
+		&i.RecurRule,
+		&i.CreatedAt,
+		&i.ColumnID,
+		&i.UserID,
+		&i.TelegramUserID,
+	)
+	return i, err
+}
+
 const getTodoColumn = `-- name: GetTodoColumn :one
 SELECT id, name, color, position, created_at, user_id, system_kind FROM board_columns WHERE user_id = $1 AND system_kind = 'todo' LIMIT 1
 `
@@ -196,9 +227,34 @@ func (q *Queries) ListColumns(ctx context.Context, userID *int64) ([]BoardColumn
 	return items, nil
 }
 
+const listTagsForTask = `-- name: ListTagsForTask :many
+SELECT t.id, t.name FROM tags t JOIN task_tags tt ON tt.tag_id = t.id WHERE tt.task_id = $1
+`
+
+func (q *Queries) ListTagsForTask(ctx context.Context, taskID int64) ([]Tag, error) {
+	rows, err := q.db.Query(ctx, listTagsForTask, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Tag
+	for rows.Next() {
+		var i Tag
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTasksForBoard = `-- name: ListTasksForBoard :many
 SELECT t.id, t.title, t.notes, t.priority, t.deadline,
-       t.column_id, t.delegated_to, t.is_recurring, t.created_at, t.done_at,
+       t.column_id, t.delegated_to, t.is_recurring, t.recur_rule,
+       t.created_at, t.done_at,
        p.name AS project_name, p.color AS project_color,
        COALESCE(array_agg(tg.name ORDER BY tg.name) FILTER (WHERE tg.name IS NOT NULL), '{}') AS tags
 FROM tasks t
@@ -219,6 +275,7 @@ type ListTasksForBoardRow struct {
 	ColumnID     int64              `json:"column_id"`
 	DelegatedTo  *string            `json:"delegated_to"`
 	IsRecurring  bool               `json:"is_recurring"`
+	RecurRule    *string            `json:"recur_rule"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	DoneAt       pgtype.Timestamptz `json:"done_at"`
 	ProjectName  string             `json:"project_name"`
@@ -244,6 +301,7 @@ func (q *Queries) ListTasksForBoard(ctx context.Context, userID *int64) ([]ListT
 			&i.ColumnID,
 			&i.DelegatedTo,
 			&i.IsRecurring,
+			&i.RecurRule,
 			&i.CreatedAt,
 			&i.DoneAt,
 			&i.ProjectName,
@@ -333,16 +391,20 @@ func (q *Queries) UpdateColumn(ctx context.Context, arg UpdateColumnParams) erro
 }
 
 const updateTask = `-- name: UpdateTask :exec
-UPDATE tasks SET title = $2, notes = $3, priority = $4, deadline = $5 WHERE id = $1 AND user_id = $6
+UPDATE tasks SET title = $2, notes = $3, priority = $4, deadline = $5,
+                 is_recurring = $7, recur_rule = $8
+WHERE id = $1 AND user_id = $6
 `
 
 type UpdateTaskParams struct {
-	ID       int64              `json:"id"`
-	Title    string             `json:"title"`
-	Notes    *string            `json:"notes"`
-	Priority int16              `json:"priority"`
-	Deadline pgtype.Timestamptz `json:"deadline"`
-	UserID   *int64             `json:"user_id"`
+	ID          int64              `json:"id"`
+	Title       string             `json:"title"`
+	Notes       *string            `json:"notes"`
+	Priority    int16              `json:"priority"`
+	Deadline    pgtype.Timestamptz `json:"deadline"`
+	UserID      *int64             `json:"user_id"`
+	IsRecurring bool               `json:"is_recurring"`
+	RecurRule   *string            `json:"recur_rule"`
 }
 
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
@@ -353,6 +415,8 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 		arg.Priority,
 		arg.Deadline,
 		arg.UserID,
+		arg.IsRecurring,
+		arg.RecurRule,
 	)
 	return err
 }

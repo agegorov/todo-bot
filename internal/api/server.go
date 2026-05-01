@@ -16,6 +16,7 @@ import (
 	"github.com/aegorov/todo-bot/internal/auth"
 	"github.com/aegorov/todo-bot/internal/db"
 	"github.com/aegorov/todo-bot/internal/parser"
+	"github.com/aegorov/todo-bot/internal/recurrence"
 )
 
 type Server struct {
@@ -116,6 +117,7 @@ func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
 		DelegatedTo  *string  `json:"delegated_to"`
 		Tags         []string `json:"tags"`
 		DoneAt       *string  `json:"done_at"`
+		Recurrence   *string  `json:"recurrence"`
 	}
 	resp := make([]taskResp, len(tasks))
 	for i, t := range tasks {
@@ -145,13 +147,17 @@ func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
 			s := t.DoneAt.Time.Format("02 Jan 15:04")
 			doneAt = &s
 		}
+		var rec *string
+		if t.IsRecurring && t.RecurRule != nil {
+			rec = t.RecurRule
+		}
 		resp[i] = taskResp{
 			ID: t.ID, Title: t.Title, Notes: t.Notes,
 			Priority: t.Priority, Deadline: dl, DeadlineRaw: dlRaw,
 			ColumnID: t.ColumnID,
 			ProjectName: t.ProjectName, ProjectColor: t.ProjectColor,
 			DelegatedTo: t.DelegatedTo, Tags: tags,
-			DoneAt: doneAt,
+			DoneAt: doneAt, Recurrence: rec,
 		}
 	}
 	jsonOK(w, resp)
@@ -234,11 +240,12 @@ func (s *Server) updateTask(w http.ResponseWriter, r *http.Request) {
 	u := auth.UserFromContext(r.Context())
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	var body struct {
-		Title    string   `json:"title"`
-		Notes    string   `json:"notes"`
-		Priority int16    `json:"priority"`
-		Deadline string   `json:"deadline"`
-		Tags     []string `json:"tags"`
+		Title      string   `json:"title"`
+		Notes      string   `json:"notes"`
+		Priority   int16    `json:"priority"`
+		Deadline   string   `json:"deadline"`
+		Tags       []string `json:"tags"`
+		Recurrence string   `json:"recurrence"` // "" | daily | weekly | biweekly | monthly | yearly
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Title == "" {
 		jsonError(w, nil, 400)
@@ -259,9 +266,17 @@ func (s *Server) updateTask(w http.ResponseWriter, r *http.Request) {
 	if body.Notes != "" {
 		notes = &body.Notes
 	}
+	var recurRule *string
+	isRecurring := false
+	if body.Recurrence != "" && recurrence.IsValidRule(body.Recurrence) {
+		r := body.Recurrence
+		recurRule = &r
+		isRecurring = true
+	}
 	if err := s.queries.UpdateTask(r.Context(), db.UpdateTaskParams{
 		ID: id, Title: body.Title, Notes: notes,
 		Priority: priority, Deadline: deadline,
+		IsRecurring: isRecurring, RecurRule: recurRule,
 		UserID: &u.ID,
 	}); err != nil {
 		jsonError(w, err, 500)
@@ -292,6 +307,12 @@ func (s *Server) moveTask(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err, 400)
 		return
 	}
+
+	// Читаем задачу до перемещения — нужно понять, перешла ли она из открытой в выполненную
+	before, _ := s.queries.GetTaskForUser(r.Context(), db.GetTaskForUserParams{
+		ID: id, UserID: &u.ID,
+	})
+
 	if err := s.queries.MoveTaskToColumn(r.Context(), db.MoveTaskToColumnParams{
 		ID: id, ColumnID: body.ColumnID,
 		UserID: &u.ID,
@@ -299,6 +320,16 @@ func (s *Server) moveTask(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err, 500)
 		return
 	}
+
+	// Если задача только что переехала в Done колонку (done_at был NULL → стал не NULL),
+	// и она периодическая — спавним следующую итерацию.
+	after, _ := s.queries.GetTaskForUser(r.Context(), db.GetTaskForUserParams{
+		ID: id, UserID: &u.ID,
+	})
+	if !before.DoneAt.Valid && after.DoneAt.Valid {
+		_, _ = recurrence.Spawn(r.Context(), s.queries, before, u.ID)
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -307,12 +338,23 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	// Гарантируем что Done колонка существует
 	_, _ = s.queries.EnsureDoneColumn(r.Context(), &u.ID)
+
+	// Читаем задачу до закрытия (для спавна следующей итерации)
+	task, terr := s.queries.GetTaskForUser(r.Context(), db.GetTaskForUserParams{
+		ID: id, UserID: &u.ID,
+	})
+
 	if err := s.queries.CompleteTaskForUser(r.Context(), db.CompleteTaskForUserParams{
 		ID:     id,
 		UserID: &u.ID,
 	}); err != nil {
 		jsonError(w, err, 500)
 		return
+	}
+
+	// Создаём следующую итерацию если задача периодическая
+	if terr == nil {
+		_, _ = recurrence.Spawn(r.Context(), s.queries, task, u.ID)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
