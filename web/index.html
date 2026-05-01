@@ -130,6 +130,9 @@
     .badge-dl.urgent{background:#3b1f1f;color:#f87171}
     [data-theme="light"] .badge-dl{background:#e5e7ec;color:#6b7494}
     [data-theme="light"] .badge-dl.urgent{background:#fee2e2;color:#dc2626}
+    /* Закрытые задачи всегда серые — она уже выполнена, нет смысла подсвечивать */
+    .card.done .badge-dl{background:var(--bg4);color:var(--text3)}
+    [data-theme="light"] .card.done .badge-dl{background:#e5e7ec;color:#6b7494}
     .badge-del{background:var(--badge-del-bg);color:var(--badge-del-color)}
     .badge-recur{background:var(--badge-proj-bg);color:var(--accent)}
     .badge-tag{background:var(--badge-tag-bg);color:var(--badge-tag-color);cursor:pointer}
