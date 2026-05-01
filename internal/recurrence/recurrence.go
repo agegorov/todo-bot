@@ -45,7 +45,11 @@ func Spawn(ctx context.Context, q *db.Queries, task db.Task, userID int64) (int6
 		return 0, nil
 	}
 
-	// Якорь — старый дедлайн, иначе now()
+	// Якорь — старый дедлайн, иначе now().
+	// Сдвиг происходит ОТ ЯКОРЯ, а не от даты завершения, чтобы день недели
+	// и время оставались стабильными (закрыл в четверг задачу со средой —
+	// следующая всё равно будет в среду). Если получившаяся дата ещё в прошлом
+	// (давно не закрывали), доматываем периодами до будущего.
 	anchor := time.Now()
 	if task.Deadline.Valid {
 		anchor = task.Deadline.Time
@@ -53,6 +57,13 @@ func Spawn(ctx context.Context, q *db.Queries, task db.Task, userID int64) (int6
 	next := NextDeadline(rule, anchor)
 	if next.IsZero() {
 		return 0, nil
+	}
+	now := time.Now()
+	for i := 0; i < 1000 && !next.After(now); i++ {
+		next = NextDeadline(rule, next)
+		if next.IsZero() {
+			return 0, nil
+		}
 	}
 
 	deadline := pgtype.Timestamptz{Time: next, Valid: true}
