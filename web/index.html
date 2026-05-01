@@ -318,6 +318,7 @@ function applyTheme(t) {
   document.documentElement.setAttribute('data-theme', t);
   themeBtn.textContent = t === 'dark' ? '🌙' : '☀️';
   localStorage.setItem('theme', t);
+  window.dispatchEvent(new CustomEvent('themechange', { detail: t }));
 }
 
 themeBtn.addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
@@ -887,9 +888,11 @@ setInterval(load, 30000);
   import { TimepickerUI } from 'https://esm.sh/timepicker-ui@4.3.0';
 
   const input = document.getElementById('editTime');
+  const initialTheme = (document.documentElement.getAttribute('data-theme') === 'light') ? 'basic' : 'dark';
+
   const picker = new TimepickerUI(input, {
-    clock: { type: '24h' },
-    ui: { theme: 'dark', mobile: false, animation: true, backdrop: true },
+    clock: { type: '24h', incrementMinutes: 5 },
+    ui: { theme: initialTheme, mobile: false, animation: true, backdrop: true },
     labels: {
       ok: 'Готово',
       cancel: 'Отмена',
@@ -906,6 +909,11 @@ setInterval(load, 30000);
   });
   picker.create();
   window.__tpInstance = picker;
+
+  // Слушаем смену темы доски и подменяем тему пикера
+  window.addEventListener('themechange', e => {
+    try { picker.update({ ui: { theme: e.detail === 'light' ? 'basic' : 'dark' } }); } catch(_){}
+  });
 </script>
 
 </body>
