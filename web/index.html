@@ -126,9 +126,10 @@
     .card-meta{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
     .badge{font-size:11px;padding:2px 6px;border-radius:4px;font-weight:500}
     .badge-proj{background:var(--badge-proj-bg);color:var(--badge-proj-color)}
-    .badge-dl{background:var(--badge-dl-bg);color:var(--badge-dl-color)}
-    .badge-dl.overdue{background:#3b1f1f;color:#f87171}
-    [data-theme="light"] .badge-dl.overdue{background:#fee2e2;color:#dc2626}
+    .badge-dl{background:var(--bg4);color:var(--text3)}
+    .badge-dl.urgent{background:#3b1f1f;color:#f87171}
+    [data-theme="light"] .badge-dl{background:#e5e7ec;color:#6b7494}
+    [data-theme="light"] .badge-dl.urgent{background:#fee2e2;color:#dc2626}
     .badge-del{background:var(--badge-del-bg);color:var(--badge-del-color)}
     .badge-recur{background:var(--badge-proj-bg);color:var(--accent)}
     .badge-tag{background:var(--badge-tag-bg);color:var(--badge-tag-color);cursor:pointer}
@@ -561,8 +562,16 @@ function makeTagGroup(name, tasks) {
 // ── Card HTML ─────────────────────────────────────────────────────────────────
 
 function makeCardHTML(t, showColumn) {
-  const now = new Date();
-  const overdue = t.deadline && new Date(t.deadline) < now ? 'overdue' : '';
+  // Дедлайн «горит» если сегодня, завтра или уже просрочен (сравниваем по календарным дням).
+  // Используем deadline_raw — в нём ISO с годом, а deadline это локализованная строка для отображения.
+  let urgent = '';
+  if (t.deadline_raw) {
+    const due = new Date(t.deadline_raw);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+    const diffDays = Math.round((dueDay - today) / 86400000);
+    if (diffDays <= 1) urgent = 'urgent';
+  }
   const colName = showColumn ? (state.columns.find(c=>c.id===t.column_id)?.name || '') : '';
   const tagsHTML = (t.tags||[]).map(tag =>
     `<span class="badge badge-tag" data-tag="${esc(tag)}">#${esc(tag)}</span>`
@@ -577,7 +586,7 @@ function makeCardHTML(t, showColumn) {
       <div class="card-meta">
         <span class="pdot p${t.priority}"></span>
         <span class="badge badge-proj" style="border-left:3px solid ${t.project_color}">${esc(t.project_name)}</span>
-        ${t.deadline ? `<span class="badge badge-dl ${overdue}">📅 ${esc(t.deadline)}</span>` : ''}
+        ${t.deadline ? `<span class="badge badge-dl ${urgent}">📅 ${esc(t.deadline)}</span>` : ''}
         ${t.recurrence ? `<span class="badge badge-recur" title="Повторение: ${esc(t.recurrence)}">🔁</span>` : ''}
         ${t.delegated_to ? `<span class="badge badge-del">👤 ${esc(t.delegated_to)}</span>` : ''}
         ${showColumn && colName ? `<span class="badge badge-col">⬛ ${esc(colName)}</span>` : ''}
