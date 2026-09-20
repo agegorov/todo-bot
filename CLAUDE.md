@@ -138,7 +138,6 @@ cd /root/todo-bot && git pull && chmod +x scripts/deploy.sh
 
 ```
 TELEGRAM_TOKEN=8705172620:...
-TELEGRAM_OWNER_ID=2057581           # legacy, сейчас не используется
 DATABASE_URL=postgres://todobot:todobot@postgres:5432/todobot
 WHISPER_ENDPOINT=http://host.docker.internal:8080
 GOOGLE_CLIENT_ID=...apps.googleusercontent.com
@@ -200,6 +199,7 @@ WEB_PORT=3000                       # опционально, по умолча�
 - ✅ Esc закрывает любое открытое модальное окно
 - ✅ Клик по всей карточке = редактирование
 - ✅ Deploy-скрипт со stateful миграциями (`schema_migrations` таблица)
+- ✅ Бот реально мультипользовательский: owner-гейт снят, `/list`/`/today`/`/overdue` фильтруют по scope отправителя (веб-аккаунт либо собственные orphan-задачи), `/done` не даёт закрыть чужую orphan-задачу, напоминания и еженедельный дайджест адресные (в чат владельца задачи/пользователя, а не единственному owner'у)
 
 ## Что НЕ сделано, известные ограничения
 
@@ -208,10 +208,10 @@ WEB_PORT=3000                       # опционально, по умолча�
 - Нет подзадач/чеклистов
 - Нет mobile-адаптива (доска на телефоне неудобна)
 - Нет archive → Done растёт неограниченно
-- Нет push-уведомлений (только напоминание в Telegram за 1 час до дедлайна)
+- Нет push-уведомлений (только напоминание в Telegram за 1 час до дедлайна, и только если у пользователя привязан Telegram)
 - Нет ручной сортировки карточек внутри колонки (порядок = priority + deadline)
 - Нет цветовой дифференциации тегов
-- Bot-команды `/list` `/today` `/overdue` не фильтруют по user_id (single-user legacy)
+- `CleanExpiredSessions` сгенерирован sqlc, но не вызывается — просроченные сессии не чистятся
 
 ---
 

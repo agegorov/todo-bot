@@ -64,15 +64,15 @@ func toRows[T any](tasks []T, fn func(T) taskRow) []taskRow {
 	return rows
 }
 
-func openTaskRow(t db.ListOpenTasksRow) taskRow {
+func openTaskRow(t db.ListOpenTasksForTelegramRow) taskRow {
 	return taskRow{ID: t.ID, Title: t.Title, Priority: t.Priority, Deadline: t.Deadline, DelegatedTo: t.DelegatedTo}
 }
 
-func todayTaskRow(t db.ListTodayTasksRow) taskRow {
+func todayTaskRow(t db.ListTodayTasksForTelegramRow) taskRow {
 	return taskRow{ID: t.ID, Title: t.Title, Priority: t.Priority, Deadline: t.Deadline, DelegatedTo: t.DelegatedTo}
 }
 
-func overdueTaskRow(t db.ListOverdueTasksRow) taskRow {
+func overdueTaskRow(t db.ListOverdueTasksForTelegramRow) taskRow {
 	return taskRow{ID: t.ID, Title: t.Title, Priority: t.Priority, Deadline: t.Deadline, DelegatedTo: t.DelegatedTo}
 }
 
@@ -90,14 +90,14 @@ func formatRows(title string, rows []taskRow) string {
 	return sb.String()
 }
 
-func formatOpenTasks(title string, tasks []db.ListOpenTasksRow) string {
+func formatOpenTasks(title string, tasks []db.ListOpenTasksForTelegramRow) string {
 	return formatRows(title, toRows(tasks, openTaskRow))
 }
 
-func formatTodayTasks(title string, tasks []db.ListTodayTasksRow) string {
+func formatTodayTasks(title string, tasks []db.ListTodayTasksForTelegramRow) string {
 	return formatRows(title, toRows(tasks, todayTaskRow))
 }
 
-func formatOverdueTasks(title string, tasks []db.ListOverdueTasksRow) string {
+func formatOverdueTasks(title string, tasks []db.ListOverdueTasksForTelegramRow) string {
 	return formatRows(title, toRows(tasks, overdueTaskRow))
 }

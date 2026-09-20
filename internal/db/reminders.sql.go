@@ -35,9 +35,10 @@ func (q *Queries) CreateReminder(ctx context.Context, arg CreateReminderParams) 
 }
 
 const listDueReminders = `-- name: ListDueReminders :many
-SELECT r.id, r.task_id, r.remind_at, r.sent, t.title AS task_title, t.deadline AS task_deadline
+SELECT r.id, r.task_id, r.remind_at, r.sent, t.title AS task_title, t.deadline AS task_deadline, COALESCE(u.telegram_id, t.telegram_user_id) AS chat_id
 FROM reminders r
 JOIN tasks t ON t.id = r.task_id
+LEFT JOIN users u ON u.id = t.user_id
 WHERE r.sent = FALSE AND r.remind_at <= NOW()
 `
 
@@ -48,6 +49,7 @@ type ListDueRemindersRow struct {
 	Sent         bool               `json:"sent"`
 	TaskTitle    string             `json:"task_title"`
 	TaskDeadline pgtype.Timestamptz `json:"task_deadline"`
+	ChatID       *int64             `json:"chat_id"`
 }
 
 func (q *Queries) ListDueReminders(ctx context.Context) ([]ListDueRemindersRow, error) {
@@ -66,7 +68,41 @@ func (q *Queries) ListDueReminders(ctx context.Context) ([]ListDueRemindersRow, 
 			&i.Sent,
 			&i.TaskTitle,
 			&i.TaskDeadline,
+			&i.ChatID,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLinkedUsersOverdueCounts = `-- name: ListLinkedUsersOverdueCounts :many
+SELECT u.telegram_id, COUNT(t.id) FILTER (WHERE t.done_at IS NULL AND t.deadline < NOW()) AS overdue_count
+FROM users u
+LEFT JOIN tasks t ON t.user_id = u.id
+WHERE u.telegram_id IS NOT NULL
+GROUP BY u.telegram_id
+`
+
+type ListLinkedUsersOverdueCountsRow struct {
+	TelegramID   *int64 `json:"telegram_id"`
+	OverdueCount int64  `json:"overdue_count"`
+}
+
+func (q *Queries) ListLinkedUsersOverdueCounts(ctx context.Context) ([]ListLinkedUsersOverdueCountsRow, error) {
+	rows, err := q.db.Query(ctx, listLinkedUsersOverdueCounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLinkedUsersOverdueCountsRow
+	for rows.Next() {
+		var i ListLinkedUsersOverdueCountsRow
+		if err := rows.Scan(&i.TelegramID, &i.OverdueCount); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

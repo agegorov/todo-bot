@@ -25,15 +25,14 @@ type Bot struct {
 	api     *tgbotapi.BotAPI
 	queries *db.Queries
 	whisper *whisper.Client
-	ownerID int64
 }
 
-func New(token string, ownerID int64, q *db.Queries, w *whisper.Client) (*Bot, error) {
+func New(token string, q *db.Queries, w *whisper.Client) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, err
 	}
-	return &Bot{api: api, queries: q, whisper: w, ownerID: ownerID}, nil
+	return &Bot{api: api, queries: q, whisper: w}, nil
 }
 
 func (b *Bot) Run(ctx context.Context) {
@@ -52,10 +51,9 @@ func (b *Bot) Run(ctx context.Context) {
 			if update.Message == nil {
 				continue
 			}
-			if update.Message.From.ID != b.ownerID {
-				b.send(update.Message.Chat.ID, "Доступ запрещён.")
-				continue
-			}
+			// Бот мультипользовательский: сообщения принимаются от любого
+			// Telegram-юзера. Изоляция данных — на уровне БД (user_id /
+			// telegram_user_id), а не входным гейтом по единственному owner ID.
 			go b.handleMessage(ctx, update.Message)
 		}
 	}
@@ -127,11 +125,7 @@ func (b *Bot) createTaskFromText(ctx context.Context, text string, chatID int64,
 
 	// Если Telegram-аккаунт уже привязан — сразу сохраняем user_id, иначе задача
 	// зависнет как orphan и не появится ни на чьей доске.
-	var linkedUserID *int64
-	if u, err := b.queries.GetUserByTelegramID(ctx, &telegramUserID); err == nil {
-		id := u.ID
-		linkedUserID = &id
-	}
+	linkedUserID := b.resolveLinkedUserID(ctx, telegramUserID)
 
 	task, err := b.queries.CreateTask(ctx, db.CreateTaskParams{
 		ProjectID:      projectID,
@@ -195,11 +189,11 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 
 	switch cmd {
 	case "/list":
-		b.cmdList(ctx, msg.Chat.ID)
+		b.cmdList(ctx, msg.Chat.ID, msg.From.ID)
 	case "/today":
-		b.cmdToday(ctx, msg.Chat.ID)
+		b.cmdToday(ctx, msg.Chat.ID, msg.From.ID)
 	case "/overdue":
-		b.cmdOverdue(ctx, msg.Chat.ID)
+		b.cmdOverdue(ctx, msg.Chat.ID, msg.From.ID)
 	case "/done":
 		if len(parts) < 2 {
 			b.send(msg.Chat.ID, "Использование: /done <id>")
@@ -221,8 +215,21 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 	}
 }
 
-func (b *Bot) cmdList(ctx context.Context, chatID int64) {
-	tasks, err := b.queries.ListOpenTasks(ctx)
+// resolveLinkedUserID возвращает ID веб-аккаунта, привязанного к этому Telegram-юзеру,
+// или nil, если привязки ещё нет (orphan-состояние до /link).
+func (b *Bot) resolveLinkedUserID(ctx context.Context, telegramUserID int64) *int64 {
+	u, err := b.queries.GetUserByTelegramID(ctx, &telegramUserID)
+	if err != nil {
+		return nil
+	}
+	id := u.ID
+	return &id
+}
+
+func (b *Bot) cmdList(ctx context.Context, chatID, telegramUserID int64) {
+	tasks, err := b.queries.ListOpenTasksForTelegram(ctx, db.ListOpenTasksForTelegramParams{
+		UserID: b.resolveLinkedUserID(ctx, telegramUserID), TelegramUserID: telegramUserID,
+	})
 	if err != nil || len(tasks) == 0 {
 		b.send(chatID, "Задач нет 🎉")
 		return
@@ -230,8 +237,10 @@ func (b *Bot) cmdList(ctx context.Context, chatID int64) {
 	b.send(chatID, formatOpenTasks("Все открытые задачи", tasks))
 }
 
-func (b *Bot) cmdToday(ctx context.Context, chatID int64) {
-	tasks, err := b.queries.ListTodayTasks(ctx)
+func (b *Bot) cmdToday(ctx context.Context, chatID, telegramUserID int64) {
+	tasks, err := b.queries.ListTodayTasksForTelegram(ctx, db.ListTodayTasksForTelegramParams{
+		UserID: b.resolveLinkedUserID(ctx, telegramUserID), TelegramUserID: telegramUserID,
+	})
 	if err != nil || len(tasks) == 0 {
 		b.send(chatID, "На сегодня задач нет 🎉")
 		return
@@ -239,8 +248,10 @@ func (b *Bot) cmdToday(ctx context.Context, chatID int64) {
 	b.send(chatID, formatTodayTasks("Задачи на сегодня", tasks))
 }
 
-func (b *Bot) cmdOverdue(ctx context.Context, chatID int64) {
-	tasks, err := b.queries.ListOverdueTasks(ctx)
+func (b *Bot) cmdOverdue(ctx context.Context, chatID, telegramUserID int64) {
+	tasks, err := b.queries.ListOverdueTasksForTelegram(ctx, db.ListOverdueTasksForTelegramParams{
+		UserID: b.resolveLinkedUserID(ctx, telegramUserID), TelegramUserID: telegramUserID,
+	})
 	if err != nil || len(tasks) == 0 {
 		b.send(chatID, "Просроченных задач нет ✅")
 		return
@@ -278,9 +289,18 @@ func (b *Bot) cmdDone(ctx context.Context, chatID int64, telegramUserID int64, i
 			return
 		}
 	} else {
-		// Не привязан — старое поведение, просто ставим done_at
-		if err := b.queries.CompleteTask(ctx, id); err != nil {
+		// Не привязан — закрываем только собственную orphan-задачу этого TG-юзера.
+		// Без этой проверки (после снятия owner-гейта) любой смог бы закрыть чужую
+		// задачу, просто угадав/подобрав id.
+		affected, err := b.queries.CompleteOrphanTaskForTelegram(ctx, db.CompleteOrphanTaskForTelegramParams{
+			ID: id, TelegramUserID: telegramUserID,
+		})
+		if err != nil {
 			b.send(chatID, "❌ Ошибка: "+err.Error())
+			return
+		}
+		if affected == 0 {
+			b.send(chatID, "Задача не найдена — возможно, она не твоя или уже закрыта.")
 			return
 		}
 	}
@@ -386,8 +406,15 @@ func (b *Bot) send(chatID int64, text string) {
 	}
 }
 
-// SendReminder отправляет напоминание — вызывается планировщиком.
-func (b *Bot) SendReminder(taskTitle string, deadline time.Time) {
+// SendReminder отправляет напоминание конкретному чату — вызывается планировщиком.
+// chatID приходит из ListDueReminders: telegram_id привязанного веб-юзера, либо
+// telegram_user_id самой задачи, если аккаунт ещё не привязан.
+func (b *Bot) SendReminder(chatID int64, taskTitle string, deadline time.Time) {
 	text := fmt.Sprintf("⏰ Напоминание: *%s*\nДедлайн: %s", taskTitle, deadline.Format("02 Jan 15:04"))
-	b.send(b.ownerID, text)
+	b.send(chatID, text)
+}
+
+// SendMessage отправляет произвольный текст конкретному чату (например, дайджест).
+func (b *Bot) SendMessage(chatID int64, text string) {
+	b.send(chatID, text)
 }

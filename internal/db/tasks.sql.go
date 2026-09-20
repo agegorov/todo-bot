@@ -11,13 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const completeTask = `-- name: CompleteTask :exec
-UPDATE tasks SET done_at = NOW() WHERE id = $1
+const completeOrphanTaskForTelegram = `-- name: CompleteOrphanTaskForTelegram :execrows
+UPDATE tasks SET done_at = NOW()
+WHERE id = $1
+  AND user_id IS NULL
+  AND telegram_user_id = $2
+  AND done_at IS NULL
 `
 
-func (q *Queries) CompleteTask(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, completeTask, id)
-	return err
+type CompleteOrphanTaskForTelegramParams struct {
+	ID             int64 `json:"id"`
+	TelegramUserID int64 `json:"telegram_user_id"`
+}
+
+func (q *Queries) CompleteOrphanTaskForTelegram(ctx context.Context, arg CompleteOrphanTaskForTelegramParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeOrphanTaskForTelegram, arg.ID, arg.TelegramUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const createTask = `-- name: CreateTask :one
@@ -134,15 +146,24 @@ func (q *Queries) GetTask(ctx context.Context, id int64) (GetTaskRow, error) {
 	return i, err
 }
 
-const listOpenTasks = `-- name: ListOpenTasks :many
+const listOpenTasksForTelegram = `-- name: ListOpenTasksForTelegram :many
 SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, t.telegram_user_id, p.name AS project_name
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
 WHERE t.done_at IS NULL
+  AND (
+        ($1::bigint IS NOT NULL AND t.user_id = $1)
+     OR (t.user_id IS NULL AND t.telegram_user_id = $2)
+  )
 ORDER BY t.priority, t.deadline NULLS LAST, t.created_at
 `
 
-type ListOpenTasksRow struct {
+type ListOpenTasksForTelegramParams struct {
+	UserID         *int64 `json:"user_id"`
+	TelegramUserID int64  `json:"telegram_user_id"`
+}
+
+type ListOpenTasksForTelegramRow struct {
 	ID             int64              `json:"id"`
 	ProjectID      int64              `json:"project_id"`
 	Title          string             `json:"title"`
@@ -160,15 +181,15 @@ type ListOpenTasksRow struct {
 	ProjectName    string             `json:"project_name"`
 }
 
-func (q *Queries) ListOpenTasks(ctx context.Context) ([]ListOpenTasksRow, error) {
-	rows, err := q.db.Query(ctx, listOpenTasks)
+func (q *Queries) ListOpenTasksForTelegram(ctx context.Context, arg ListOpenTasksForTelegramParams) ([]ListOpenTasksForTelegramRow, error) {
+	rows, err := q.db.Query(ctx, listOpenTasksForTelegram, arg.UserID, arg.TelegramUserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListOpenTasksRow
+	var items []ListOpenTasksForTelegramRow
 	for rows.Next() {
-		var i ListOpenTasksRow
+		var i ListOpenTasksForTelegramRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
@@ -196,16 +217,25 @@ func (q *Queries) ListOpenTasks(ctx context.Context) ([]ListOpenTasksRow, error)
 	return items, nil
 }
 
-const listOverdueTasks = `-- name: ListOverdueTasks :many
+const listOverdueTasksForTelegram = `-- name: ListOverdueTasksForTelegram :many
 SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, t.telegram_user_id, p.name AS project_name
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
 WHERE t.done_at IS NULL
   AND t.deadline < NOW()
+  AND (
+        ($1::bigint IS NOT NULL AND t.user_id = $1)
+     OR (t.user_id IS NULL AND t.telegram_user_id = $2)
+  )
 ORDER BY t.deadline
 `
 
-type ListOverdueTasksRow struct {
+type ListOverdueTasksForTelegramParams struct {
+	UserID         *int64 `json:"user_id"`
+	TelegramUserID int64  `json:"telegram_user_id"`
+}
+
+type ListOverdueTasksForTelegramRow struct {
 	ID             int64              `json:"id"`
 	ProjectID      int64              `json:"project_id"`
 	Title          string             `json:"title"`
@@ -223,15 +253,15 @@ type ListOverdueTasksRow struct {
 	ProjectName    string             `json:"project_name"`
 }
 
-func (q *Queries) ListOverdueTasks(ctx context.Context) ([]ListOverdueTasksRow, error) {
-	rows, err := q.db.Query(ctx, listOverdueTasks)
+func (q *Queries) ListOverdueTasksForTelegram(ctx context.Context, arg ListOverdueTasksForTelegramParams) ([]ListOverdueTasksForTelegramRow, error) {
+	rows, err := q.db.Query(ctx, listOverdueTasksForTelegram, arg.UserID, arg.TelegramUserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListOverdueTasksRow
+	var items []ListOverdueTasksForTelegramRow
 	for rows.Next() {
-		var i ListOverdueTasksRow
+		var i ListOverdueTasksForTelegramRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
@@ -288,16 +318,25 @@ func (q *Queries) ListProjects(ctx context.Context) ([]Project, error) {
 	return items, nil
 }
 
-const listTodayTasks = `-- name: ListTodayTasks :many
+const listTodayTasksForTelegram = `-- name: ListTodayTasksForTelegram :many
 SELECT t.id, t.project_id, t.title, t.notes, t.priority, t.deadline, t.done_at, t.delegated_to, t.is_recurring, t.recur_rule, t.created_at, t.column_id, t.user_id, t.telegram_user_id, p.name AS project_name
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
 WHERE t.done_at IS NULL
   AND t.deadline < NOW() + INTERVAL '24 hours'
+  AND (
+        ($1::bigint IS NOT NULL AND t.user_id = $1)
+     OR (t.user_id IS NULL AND t.telegram_user_id = $2)
+  )
 ORDER BY t.deadline NULLS LAST
 `
 
-type ListTodayTasksRow struct {
+type ListTodayTasksForTelegramParams struct {
+	UserID         *int64 `json:"user_id"`
+	TelegramUserID int64  `json:"telegram_user_id"`
+}
+
+type ListTodayTasksForTelegramRow struct {
 	ID             int64              `json:"id"`
 	ProjectID      int64              `json:"project_id"`
 	Title          string             `json:"title"`
@@ -315,15 +354,15 @@ type ListTodayTasksRow struct {
 	ProjectName    string             `json:"project_name"`
 }
 
-func (q *Queries) ListTodayTasks(ctx context.Context) ([]ListTodayTasksRow, error) {
-	rows, err := q.db.Query(ctx, listTodayTasks)
+func (q *Queries) ListTodayTasksForTelegram(ctx context.Context, arg ListTodayTasksForTelegramParams) ([]ListTodayTasksForTelegramRow, error) {
+	rows, err := q.db.Query(ctx, listTodayTasksForTelegram, arg.UserID, arg.TelegramUserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListTodayTasksRow
+	var items []ListTodayTasksForTelegramRow
 	for rows.Next() {
-		var i ListTodayTasksRow
+		var i ListTodayTasksForTelegramRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
