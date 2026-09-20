@@ -125,6 +125,14 @@ func (b *Bot) createTaskFromText(ctx context.Context, text string, chatID int64,
 		recurRule = &parsed.RecurRule
 	}
 
+	// Если Telegram-аккаунт уже привязан — сразу сохраняем user_id, иначе задача
+	// зависнет как orphan и не появится ни на чьей доске.
+	var linkedUserID *int64
+	if u, err := b.queries.GetUserByTelegramID(ctx, &telegramUserID); err == nil {
+		id := u.ID
+		linkedUserID = &id
+	}
+
 	task, err := b.queries.CreateTask(ctx, db.CreateTaskParams{
 		ProjectID:      projectID,
 		Title:          parsed.Title,
@@ -134,10 +142,21 @@ func (b *Bot) createTaskFromText(ctx context.Context, text string, chatID int64,
 		DelegatedTo:    delegated,
 		IsRecurring:    parsed.IsRecurring,
 		RecurRule:      recurRule,
+		UserID:         linkedUserID,
 		TelegramUserID: &telegramUserID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("сохранение задачи: %w", err)
+	}
+
+	// И сразу кладём в системную TO DO колонку — без неё карточка не появится
+	// на доске, даже если user_id проставлен.
+	if linkedUserID != nil {
+		if todoCol, err := b.queries.EnsureTodoColumn(ctx, linkedUserID); err == nil {
+			_ = b.queries.MoveTaskToColumn(ctx, db.MoveTaskToColumnParams{
+				ID: task.ID, ColumnID: todoCol.ID, UserID: linkedUserID,
+			})
+		}
 	}
 
 	// Все задачи созданные через Telegram автоматически помечаются #telegram
